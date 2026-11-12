@@ -98,6 +98,13 @@ public static class ConstructorSelva
             return;
         }
 
+        ConstruirDesdeTextura(tex);
+    }
+
+    // Construye la selva en la escena abierta a partir de la imagen del mapa.
+    // Lo usa también ConstructorEscenas para generar la escena Nivel_Selva.
+    public static void ConstruirDesdeTextura(Texture2D tex)
+    {
         string ruta = AssetDatabase.GetAssetPath(tex);
         var imp = (TextureImporter)AssetImporter.GetAtPath(ruta);
 

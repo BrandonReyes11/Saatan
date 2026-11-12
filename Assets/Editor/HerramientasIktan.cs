@@ -8,7 +8,7 @@ using UnityEngine;
 public static class HerramientasIktan
 {
     [MenuItem("Saatan/Crear jugador de prueba (Iktan)")]
-    static void CrearJugador()
+    public static void CrearJugador()
     {
         var viejo = GameObject.Find("Iktan_Jugador");
         if (viejo != null) Object.DestroyImmediate(viejo);
