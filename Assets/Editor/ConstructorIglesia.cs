@@ -1,6 +1,8 @@
 // Saatan Historia - Iglesia con paredes, vitrales, altares y ofrendas de Hanal Pixán.
 // Colocar en: Assets/Editor/ConstructorIglesia.cs
-// Se usa con la imagen iglesia_detallada.png (seleccionarla en Project antes de usar el menú).
+// Usa Assets/Mapas/iglesia_detallada (2).png (o la imagen seleccionada en Project).
+// Cada píxel del mapa mide ESCALA metros. La iglesia está abandonada: techo en cúpula muy alto con
+// vitrales por donde entra luz natural, cuatro pilares con un candelabro en el centro, cajas y escombros.
 //
 // Colores del mapa:
 //   BLANCO piso          NEGRO    límite invisible (colisión)
@@ -20,8 +22,11 @@ public static class ConstructorIglesia
 {
     enum Tipo { Piso, Limite, Banca, Caja, Vela, Altar, Vitral, Diablo, Inicio, Ofrenda }
 
-    const float RadioPared = 19.6f;
-    const int AltoPared = 6;
+    const float ESCALA = 1.5f;              // metros por píxel del mapa (más grande y amplia)
+    const float RadioPared = 19.6f * ESCALA;
+    const int AltoPared = 14;               // altura de los muros
+    const float AltoCupula = 10f;           // la cúpula sube 10 m más sobre los muros
+    const float LadoPilares = 5f;           // pilares del candelabro en (±5, ±5)
     const int Segmentos = 120;      // 3 grados cada uno
 
     static readonly (Color32 color, Tipo tipo)[] paleta =
@@ -72,7 +77,17 @@ public static class ConstructorIglesia
         { "Ojo", new Color(0.05f, 0.03f, 0.07f) },
         { "MarcadorDiablo", new Color(0.90f, 0.00f, 0.00f) },
         { "MarcadorInicio", new Color(0.00f, 0.40f, 1.00f) },
+        { "Techo", new Color(0.30f, 0.26f, 0.36f) },
+        { "TechoOscuro", new Color(0.20f, 0.17f, 0.25f) },
+        { "Hierro", new Color(0.12f, 0.11f, 0.10f) },
+        { "RayoRojo", new Color(0.30f, 0.06f, 0.05f, 1f) },
+        { "RayoAzul", new Color(0.06f, 0.10f, 0.30f, 1f) },
+        { "RayoVerde", new Color(0.05f, 0.22f, 0.10f, 1f) },
+        { "RayoAmarillo", new Color(0.30f, 0.24f, 0.08f, 1f) },
     };
+
+    static readonly string[] vidrios = { "Rojo", "Azul", "Amarillo", "Verde" };
+    static System.Random rnd;
 
     static readonly Dictionary<string, Material> cache = new Dictionary<string, Material>();
 
@@ -87,11 +102,13 @@ public static class ConstructorIglesia
     static void Construir()
     {
         var tex = Selection.activeObject as Texture2D;
+        if (tex == null) tex = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Mapas/iglesia_detallada (2).png");
         if (tex == null)
         {
-            EditorUtility.DisplayDialog("Saatan", "Primero selecciona iglesia_detallada.png en la ventana Project y vuelve a intentarlo.", "OK");
+            EditorUtility.DisplayDialog("Saatan", "No se encontró iglesia_detallada (2).png en Assets/Mapas.", "OK");
             return;
         }
+        rnd = new System.Random(7);
 
         string ruta = AssetDatabase.GetAssetPath(tex);
         var imp = (TextureImporter)AssetImporter.GetAtPath(ruta);
@@ -134,6 +151,16 @@ public static class ConstructorIglesia
             foreach (var celda in c) mapa[celda.x, celda.y] = (int)Tipo.Limite;
         }
 
+        // El centro queda libre para los pilares del candelabro.
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                Vector3 p = Pos(x, y, w, h);
+                var t = (Tipo)mapa[x, y];
+                if (Mathf.Abs(p.x) < LadoPilares + 1.5f && Mathf.Abs(p.z) < LadoPilares + 1.5f && (t == Tipo.Banca || t == Tipo.Caja || t == Tipo.Vela))
+                    mapa[x, y] = (int)Tipo.Piso;
+            }
+
         // ---- Piso con baldosas, alfombra y colisiones (el límite NO se ve) ----
         var tmp = GameObject.CreatePrimitive(PrimitiveType.Cube);
         Mesh cubo = tmp.GetComponent<MeshFilter>().sharedMesh;
@@ -151,13 +178,13 @@ public static class ConstructorIglesia
 
                 if (!limite)
                 {
-                    bool alfombra = Mathf.Abs(p.x) <= 0.51f && p.z > -16f && p.z < 15f;
-                    if (alfombra) Sumar(visibles, "Alfombra", cubo, new Vector3(p.x, -0.09f, p.z), new Vector3(1f, 0.22f, 1f));
-                    else Sumar(visibles, ((x + y) % 2 == 0) ? "PisoA" : "PisoB", cubo, new Vector3(p.x, -0.1f, p.z), new Vector3(0.96f, 0.2f, 0.96f));
+                    bool alfombra = Mathf.Abs(p.x) <= 0.51f * ESCALA && p.z > -16f * ESCALA && p.z < 15f * ESCALA;
+                    if (alfombra) Sumar(visibles, "Alfombra", cubo, new Vector3(p.x, -0.09f, p.z), new Vector3(ESCALA, 0.22f, ESCALA));
+                    else Sumar(visibles, ((x + y) % 2 == 0) ? "PisoA" : "PisoB", cubo, new Vector3(p.x, -0.1f, p.z), new Vector3(ESCALA * 0.97f, 0.2f, ESCALA * 0.97f));
                 }
 
-                SumarLista(colision, cubo, new Vector3(p.x, -0.1f, p.z), new Vector3(1f, 0.2f, 1f));
-                if (limite) SumarLista(colision, cubo, new Vector3(p.x, 3f, p.z), new Vector3(1f, 6f, 1f));
+                SumarLista(colision, cubo, new Vector3(p.x, -0.1f, p.z), new Vector3(ESCALA, 0.2f, ESCALA));
+                if (limite) SumarLista(colision, cubo, new Vector3(p.x, AltoPared / 2f, p.z), new Vector3(ESCALA, AltoPared, ESCALA));
             }
 
         foreach (var par in visibles)
@@ -173,12 +200,25 @@ public static class ConstructorIglesia
         lim.transform.SetParent(raiz, false);
         lim.AddComponent<MeshCollider>().sharedMesh = GuardarMalla("Colision", colision);
 
-        // ---- Paredes de la iglesia ----
-        Pared(raiz, ventanas);
+        // ---- Paredes, vitrales altos, cúpula y pilares ----
+        int[] pilastras = { 0, 8, 18, 41, 51, 59, 75, 90, 105 };
+        var altas = new List<int>();   // vitrales altos (2 segmentos de ancho) lejos de las pilastras
+        for (float k = 4f; k < Segmentos; k += 7.5f)
+        {
+            int i = Mathf.FloorToInt(k);
+            bool libre = true;
+            foreach (int pk in pilastras)
+                if (Mathf.Abs(Mathf.DeltaAngle(i * 3f, pk * 3f)) < 9f || Mathf.Abs(Mathf.DeltaAngle((i + 1) * 3f, pk * 3f)) < 9f) libre = false;
+            if (libre) altas.Add(i);
+        }
+
+        Pared(raiz, ventanas, altas);
         foreach (int k in ventanas) Ventana(raiz, k);
-        int[] pilastras = { 0, 8, 18, 41, 51, 59 };
+        for (int i = 0; i < altas.Count; i++) VentanaAlta(raiz, altas[i], vidrios[i % 4]);
         foreach (int k in pilastras) Pilastra(raiz, k);
         Banderines(raiz);
+        Cupula(raiz);
+        PilaresCandelabro(raiz);
 
         // ---- Objetos ----
         foreach (var c in Componentes(mapa, w, h, Tipo.Banca))
@@ -212,8 +252,10 @@ public static class ConstructorIglesia
                 }
             }
 
+        Abandono(raiz);
         HerramientasIktan.DarVidaAlFuego(raiz.gameObject);
         ConfigurarEscena();
+        HerramientasIktan.CrearJugador();   // Iktan en el nuevo punto de inicio, con la cámara en tercera persona
 
         AssetDatabase.SaveAssets();
         EditorSceneManager.MarkAllScenesDirty();
@@ -225,11 +267,13 @@ public static class ConstructorIglesia
 
     // Muro curvo con caras solo hacia adentro: desde la cámara se ve el interior
     // de los muros del fondo y los muros cercanos no estorban la vista.
-    static void Pared(Transform raiz, HashSet<int> ventanas)
+    static void Pared(Transform raiz, HashSet<int> ventanas, List<int> altas)
     {
         var abre = new HashSet<int>();
         foreach (int k in ventanas)
             for (int d = -1; d <= 1; d++) abre.Add(((k + d) % Segmentos + Segmentos) % Segmentos);
+        var abreAlto = new HashSet<int>();
+        foreach (int k in altas) { abreAlto.Add(k); abreAlto.Add((k + 1) % Segmentos); }
 
         var tonos = new Acum[] { new Acum(), new Acum(), new Acum() };
         float paso = 360f / Segmentos;
@@ -243,7 +287,8 @@ public static class ConstructorIglesia
 
             for (int j = 0; j < AltoPared; j++)
             {
-                if (abre.Contains(i) && j >= 1 && j <= 3) continue;   // hueco del vitral
+                if (abre.Contains(i) && j >= 1 && j <= 3) continue;        // hueco del vitral bajo
+                if (abreAlto.Contains(i) && j >= 8 && j <= 11) continue;   // hueco del vitral alto
                 int tono = (j == 0 || j == AltoPared - 1) ? 2 : ((i + j) % 2);
                 Quad(tonos[tono], PuntoPared(a0, j), PuntoPared(a1, j), PuntoPared(a1, j + 1), PuntoPared(a0, j + 1), normal);
             }
@@ -344,8 +389,8 @@ public static class ConstructorIglesia
     {
         var g = EnPared(padre, "Pilastra", (k + 0.5f) * (360f / Segmentos), RadioPared);
         Pieza(g, "Base", PrimitiveType.Cube, new Vector3(0f, 0.25f, 0.3f), new Vector3(1.4f, 0.5f, 0.9f), "PiedraOscura");
-        Pieza(g, "Fuste", PrimitiveType.Cube, new Vector3(0f, 3f, 0.25f), new Vector3(1.1f, 6f, 0.7f), "Piedra");
-        Pieza(g, "Capitel", PrimitiveType.Cube, new Vector3(0f, 5.8f, 0.3f), new Vector3(1.5f, 0.35f, 0.9f), "PiedraOscura");
+        Pieza(g, "Fuste", PrimitiveType.Cube, new Vector3(0f, AltoPared / 2f, 0.25f), new Vector3(1.1f, AltoPared, 0.7f), "Piedra");
+        Pieza(g, "Capitel", PrimitiveType.Cube, new Vector3(0f, AltoPared - 0.2f, 0.3f), new Vector3(1.5f, 0.35f, 0.9f), "PiedraOscura");
     }
 
     // Papel picado colgando de la pared, como en Hanal Pixán.
@@ -360,6 +405,213 @@ public static class ConstructorIglesia
             Pieza(g, "Cuerda", PrimitiveType.Cube, new Vector3(0f, 5.88f, 0f), new Vector3(1.05f, 0.03f, 0.03f), "Cuerda");
             n++;
         }
+    }
+
+    // Vitral alto: hueco de 2 segmentos (≈3 m) entre 8 y 12 m de altura. Entra luz natural del color del vidrio.
+    static void VentanaAlta(Transform padre, int k, string color)
+    {
+        var g = EnPared(padre, "Vitral_Alto", (k + 1f) * (360f / Segmentos), RadioPared);
+        Pieza(g, "MarcoIzq", PrimitiveType.Cube, new Vector3(-1.65f, 10f, 0.1f), new Vector3(0.3f, 4.2f, 0.5f), "PiedraOscura");
+        Pieza(g, "MarcoDer", PrimitiveType.Cube, new Vector3(1.65f, 10f, 0.1f), new Vector3(0.3f, 4.2f, 0.5f), "PiedraOscura");
+        Pieza(g, "Repisa", PrimitiveType.Cube, new Vector3(0f, 7.9f, 0.2f), new Vector3(3.6f, 0.25f, 0.6f), "Piedra");
+        Pieza(g, "Arco", PrimitiveType.Cube, new Vector3(0f, 12.15f, 0.1f), new Vector3(3.6f, 0.35f, 0.5f), "PiedraOscura");
+        for (int fila = 0; fila < 4; fila++)
+            for (int col = 0; col < 3; col++)
+            {
+                string c = (fila + col) % 3 == 0 ? "Amarillo" : (fila + col) % 3 == 1 ? color : vidrios[(fila * 3 + col + k) % 4];
+                if (rnd.NextDouble() < 0.12) continue;   // vidrios rotos
+                Pieza(g, "Cristal", PrimitiveType.Cube, new Vector3(-1.05f + col * 1.05f, 8.5f + fila * 1f, -0.05f), new Vector3(1f, 0.95f, 0.08f), "Vitral" + c);
+            }
+
+        // Rayo de luz que baja hacia el centro: foco + haz visible (aditivo).
+        Vector3 dir = new Vector3(0f, -0.75f, 1f).normalized;
+        Foco(g, new Vector3(0f, 10f, 0.6f), dir, ColorLuz(color), 34f, 45f, 7f);
+        Rayo(g, new Vector3(0f, 10f, 0.6f), dir, 18f, 2.6f, "Rayo" + color);
+    }
+
+    // Cúpula de piedra sobre los muros, con un rosetón de vidrio en lo más alto.
+    static void Cupula(Transform raiz)
+    {
+        const int anillos = 10;
+        const float rOculo = 3f;
+        var tonos = new[] { new Acum(), new Acum() };
+        float paso = 360f / Segmentos * Mathf.Deg2Rad, tMax = Mathf.Acos(rOculo / RadioPared);
+        System.Func<float, float, Vector3> P = (a, t) =>
+            new Vector3(RadioPared * Mathf.Cos(t) * Mathf.Cos(a), AltoPared + AltoCupula * Mathf.Sin(t), RadioPared * Mathf.Cos(t) * Mathf.Sin(a));
+
+        for (int i = 0; i < Segmentos; i++)
+            for (int k = 0; k < anillos; k++)
+            {
+                float a0 = i * paso, a1 = (i + 1) * paso, t0 = tMax * k / anillos, t1 = tMax * (k + 1) / anillos;
+                float am = (a0 + a1) / 2f, tm = (t0 + t1) / 2f;
+                var n = new Vector3(-Mathf.Cos(am) * Mathf.Cos(tm), -Mathf.Sin(tm), -Mathf.Sin(am) * Mathf.Cos(tm));
+                Quad(tonos[i % 15 < 2 || k == 0 ? 1 : 0], P(a0, t0), P(a1, t0), P(a1, t1), P(a0, t1), n);   // nervios más oscuros
+            }
+
+        string[] nombres = { "Techo", "TechoOscuro" };
+        for (int t = 0; t < 2; t++)
+        {
+            var malla = new Mesh { name = "Iglesia_" + nombres[t] };
+            malla.SetVertices(tonos[t].v);
+            malla.SetNormals(tonos[t].n);
+            malla.SetTriangles(tonos[t].t, 0);
+            malla.RecalculateBounds();
+            string ruta = "Assets/Niveles/Iglesia/Malla_" + nombres[t] + ".asset";
+            AssetDatabase.DeleteAsset(ruta);
+            AssetDatabase.CreateAsset(malla, ruta);
+            var go = new GameObject("Cupula_" + nombres[t]);
+            go.transform.SetParent(raiz, false);
+            go.AddComponent<MeshFilter>().sharedMesh = malla;
+            go.AddComponent<MeshRenderer>().sharedMaterial = M(nombres[t]);
+            go.isStatic = true;
+        }
+
+        // Rosetón: luz natural desde arriba sobre el candelabro.
+        float yTop = AltoPared + AltoCupula * Mathf.Sin(tMax);
+        var g = Grupo(raiz, "Roseton", new Vector3(0f, yTop, 0f));
+        Pieza(g, "Aro", PrimitiveType.Cylinder, Vector3.zero, new Vector3(rOculo * 2.2f, 0.15f, rOculo * 2.2f), "PiedraOscura");
+        Pieza(g, "Vidrio", PrimitiveType.Cylinder, Vector3.down * 0.05f, new Vector3(rOculo * 2f, 0.06f, rOculo * 2f), "VitralAzul");
+        for (int i = 0; i < 8; i++)
+        {
+            var p = Pieza(g, "Petalo", PrimitiveType.Cube, Quaternion.Euler(0f, i * 45f, 0f) * new Vector3(0f, -0.1f, 1.5f), new Vector3(0.9f, 0.05f, 1.8f), "Vitral" + vidrios[i % 4]);
+            p.localRotation = Quaternion.Euler(0f, i * 45f, 0f);
+        }
+        Pieza(g, "Centro", PrimitiveType.Cylinder, Vector3.down * 0.12f, new Vector3(1.2f, 0.06f, 1.2f), "VitralAmarillo");
+        Foco(g, Vector3.down * 0.5f, Vector3.down, new Color(1f, 0.92f, 0.75f), yTop + 4f, 35f, 9f);
+        Rayo(g, Vector3.down * 0.3f, Vector3.down, yTop, rOculo * 1.6f, "RayoAmarillo");
+    }
+
+    // Cuatro pilares de piedra con vigas que sostienen un candelabro de hierro colgante.
+    static void PilaresCandelabro(Transform raiz)
+    {
+        const float H = 11f, L = LadoPilares;
+        var g = Grupo(raiz, "Pilares_Candelabro", Vector3.zero);
+        foreach (float sx in new[] { -L, L })
+            foreach (float sz in new[] { -L, L })
+            {
+                var p = Grupo(g, "Pilar", new Vector3(sx, 0f, sz));
+                Pieza(p, "Base", PrimitiveType.Cube, new Vector3(0f, 0.35f, 0f), new Vector3(1.9f, 0.7f, 1.9f), "PiedraOscura");
+                Pieza(p, "Fuste", PrimitiveType.Cylinder, new Vector3(0f, H / 2f, 0f), new Vector3(1.2f, H / 2f, 1.2f), "Piedra");
+                Pieza(p, "Capitel", PrimitiveType.Cube, new Vector3(0f, H, 0f), new Vector3(1.8f, 0.6f, 1.8f), "PiedraOscura");
+                var bc = p.gameObject.AddComponent<BoxCollider>();
+                bc.center = new Vector3(0f, H / 2f, 0f);
+                bc.size = new Vector3(1.6f, H, 1.6f);
+            }
+
+        // Vigas entre pilares y en diagonal hasta el centro.
+        foreach (float s in new[] { -L, L })
+        {
+            Pieza(g, "Viga", PrimitiveType.Cube, new Vector3(0f, H + 0.6f, s), new Vector3(2f * L + 1.2f, 0.6f, 0.7f), "MaderaOscura");
+            Pieza(g, "Viga", PrimitiveType.Cube, new Vector3(s, H + 0.6f, 0f), new Vector3(0.7f, 0.6f, 2f * L + 1.2f), "MaderaOscura");
+        }
+        foreach (float ang in new[] { 45f, -45f })
+            Pieza(g, "Diagonal", PrimitiveType.Cube, new Vector3(0f, H + 1.1f, 0f), new Vector3(0.5f, 0.45f, 2.83f * L), "MaderaOscura").localRotation = Quaternion.Euler(0f, ang, 0f);
+
+        // Candelabro colgando de una cadena.
+        const float Y = 7f, R = 2.2f;
+        Pieza(g, "Cadena", PrimitiveType.Cube, new Vector3(0f, (H + 1f + Y) / 2f, 0f), new Vector3(0.1f, H + 1f - Y, 0.1f), "Hierro");
+        var c = Grupo(g, "Candelabro_Colgante", new Vector3(0f, Y, 0f));
+        Pieza(c, "Centro", PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.6f, 0.3f, 0.6f), "Hierro");
+        for (int i = 0; i < 16; i++)
+        {
+            float a = i * 22.5f;
+            Pieza(c, "Aro", PrimitiveType.Cube, Quaternion.Euler(0f, a, 0f) * new Vector3(0f, 0f, R), new Vector3(0.9f, 0.12f, 0.12f), "Hierro").localRotation = Quaternion.Euler(0f, a, 0f);
+        }
+        for (int i = 0; i < 4; i++)
+            Pieza(c, "Brazo", PrimitiveType.Cube, Vector3.zero, new Vector3(0.1f, 0.1f, 2f * R), "Hierro").localRotation = Quaternion.Euler(0f, i * 45f, 0f);
+        for (int i = 0; i < 8; i++)
+        {
+            Vector3 v = Quaternion.Euler(0f, i * 45f + 11.25f, 0f) * new Vector3(0f, 0f, R);
+            Pieza(c, "Vela", PrimitiveType.Cylinder, v + Vector3.up * 0.3f, new Vector3(0.18f, 0.25f, 0.18f), "Cera");
+            Pieza(c, "Llama", PrimitiveType.Sphere, v + Vector3.up * 0.68f, new Vector3(0.15f, 0.25f, 0.15f), "Llama");
+            if (i % 2 == 0) Luz(c, v + Vector3.up * 1f, new Color(1f, 0.72f, 0.35f), 12f, 3f);
+        }
+        Luz(c, Vector3.down * 0.5f, new Color(1f, 0.75f, 0.4f), 20f, 2.5f);
+    }
+
+    // Aspecto abandonado: bancas movidas o volcadas, cajas extra, escombros y tablas tiradas.
+    static void Abandono(Transform raiz)
+    {
+        var ocupado = new List<Vector3>();
+        foreach (Transform t in raiz)
+        {
+            if (t.name == "Banca" && rnd.NextDouble() < 0.4)
+            {
+                bool volcada = rnd.NextDouble() < 0.35;
+                t.localRotation *= Quaternion.Euler(volcada ? 80f : 0f, Azar(18f), volcada ? 0f : Azar(4f));
+                if (volcada) t.localPosition += Vector3.up * 0.5f;
+            }
+            if (!t.name.StartsWith("Pared") && !t.name.StartsWith("Cupula") && !t.name.StartsWith("Piso") && t.name != "Banderin")
+                ocupado.Add(t.localPosition);
+        }
+
+        System.Func<float, float, Vector3> Libre = (rMin, rMax) =>
+        {
+            for (int intento = 0; intento < 40; intento++)
+            {
+                float a = (float)rnd.NextDouble() * Mathf.PI * 2f, r = Mathf.Lerp(rMin, rMax, (float)rnd.NextDouble());
+                var p = new Vector3(r * Mathf.Cos(a), 0f, r * Mathf.Sin(a));
+                bool ok = Mathf.Abs(p.x) > LadoPilares + 2f || Mathf.Abs(p.z) > LadoPilares + 2f;
+                foreach (var q in ocupado) if (ok && (q - p).sqrMagnitude < 6.5f) ok = false;
+                if (ok) { ocupado.Add(p); return p; }
+            }
+            return Vector3.positiveInfinity;
+        };
+
+        for (int i = 0; i < 32; i++)   // cajas abandonadas, sobre todo junto a los muros
+        {
+            var p = Libre(i < 24 ? RadioPared - 6f : 8f, RadioPared - 2f);
+            if (float.IsInfinity(p.x)) continue;
+            Caja(raiz, p, rnd.Next(1000));
+            if (rnd.NextDouble() < 0.4) Caja(raiz, p + new Vector3(Azar(1f), 0f, 1.1f), rnd.Next(1000));
+        }
+
+        for (int i = 0; i < 16; i++)   // escombros y tablas caídas
+        {
+            var p = Libre(6f, RadioPared - 1.5f);
+            if (float.IsInfinity(p.x)) continue;
+            var g = Grupo(raiz, "Escombros", p);
+            for (int j = 0; j < 7; j++)
+            {
+                float s = Mathf.Lerp(0.25f, 0.9f, (float)rnd.NextDouble());
+                Pieza(g, "Piedra", PrimitiveType.Cube, new Vector3(Azar(1.2f), s * 0.35f, Azar(1.2f)), Vector3.one * s, j % 3 == 0 ? "Piedra" : "PiedraOscura")
+                    .localRotation = Quaternion.Euler(Azar(30f), Azar(180f), Azar(30f));
+            }
+            if (rnd.NextDouble() < 0.6)
+                Pieza(g, "Tabla", PrimitiveType.Cube, new Vector3(0f, 0.08f, 0f), new Vector3(2.8f, 0.12f, 0.3f), "MaderaOscura")
+                    .localRotation = Quaternion.Euler(0f, Azar(180f), Azar(8f));
+        }
+    }
+
+    static Quaternion Mirar(Vector3 dir) => Quaternion.LookRotation(dir, Mathf.Abs(dir.y) > 0.99f ? Vector3.forward : Vector3.up);
+
+    static float Azar(float a) => ((float)rnd.NextDouble() * 2f - 1f) * a;
+
+    static Color ColorLuz(string vidrio) =>
+        vidrio == "Rojo" ? new Color(1f, 0.55f, 0.5f) : vidrio == "Azul" ? new Color(0.6f, 0.7f, 1f)
+        : vidrio == "Verde" ? new Color(0.6f, 1f, 0.7f) : new Color(1f, 0.9f, 0.6f);
+
+    static void Foco(Transform padre, Vector3 pos, Vector3 dir, Color color, float alcance, float angulo, float intensidad)
+    {
+        var go = new GameObject("Luz_Natural");
+        go.transform.SetParent(padre, false);
+        go.transform.localPosition = pos;
+        go.transform.localRotation = Mirar(dir);
+        var l = go.AddComponent<Light>();
+        l.type = LightType.Spot;
+        l.color = color;
+        l.range = alcance;
+        l.spotAngle = angulo;
+        l.intensity = intensidad;
+        l.shadows = LightShadows.None;
+    }
+
+    // Haz de luz visible: caja alargada con material aditivo transparente.
+    static void Rayo(Transform padre, Vector3 desde, Vector3 dir, float largo, float grosor, string material)
+    {
+        var r = Pieza(padre, "Haz_Luz", PrimitiveType.Cube, desde + dir * (largo / 2f), new Vector3(grosor, grosor, largo), material);
+        r.localRotation = Mirar(dir);
+        r.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
     }
 
     // ---------------- Objetos ----------------
@@ -581,7 +833,7 @@ public static class ConstructorIglesia
 
     static Vector3 Pos(int x, int y, int w, int h)
     {
-        return new Vector3(x - w / 2f + 0.5f, 0f, y - h / 2f + 0.5f);
+        return new Vector3((x - w / 2f + 0.5f) * ESCALA, 0f, (y - h / 2f + 0.5f) * ESCALA);
     }
 
     static void Rango(List<Vector2Int> c, int w, int h, out Vector3 centro, out int ancho, out int fondo)
@@ -596,7 +848,7 @@ public static class ConstructorIglesia
         }
         ancho = maxX - minX + 1;
         fondo = maxY - minY + 1;
-        centro = new Vector3((minX + maxX) / 2f - w / 2f + 0.5f, 0f, (minY + maxY) / 2f - h / 2f + 0.5f);
+        centro = new Vector3(((minX + maxX) / 2f - w / 2f + 0.5f) * ESCALA, 0f, ((minY + maxY) / 2f - h / 2f + 0.5f) * ESCALA);
     }
 
     static List<List<Vector2Int>> Componentes(int[,] mapa, int w, int h, Tipo t)
@@ -682,6 +934,26 @@ public static class ConstructorIglesia
             m = new Material(sh);
             AssetDatabase.CreateAsset(m, ruta);
         }
+        if (nombre.StartsWith("Rayo"))
+        {
+            // Unlit transparente aditivo (sin ZWrite, visible por ambos lados).
+            m.shader = Shader.Find("Universal Render Pipeline/Unlit");
+            m.SetFloat("_Surface", 1f);
+            m.SetFloat("_Blend", 2f);
+            m.SetFloat("_Cull", 0f);
+            m.SetFloat("_ZWrite", 0f);
+            m.SetFloat("_SrcBlend", (float)BlendMode.One);
+            m.SetFloat("_DstBlend", (float)BlendMode.One);
+            m.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
+            m.SetFloat("_DstBlendAlpha", (float)BlendMode.One);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.SetOverrideTag("RenderType", "Transparent");
+            m.renderQueue = (int)RenderQueue.Transparent;
+            m.SetColor("_BaseColor", colores[nombre]);
+            EditorUtility.SetDirty(m);
+            cache[nombre] = m;
+            return m;
+        }
         m.color = colores[nombre];
         if (nombre.StartsWith("Llama") || nombre.StartsWith("Vitral"))
         {
@@ -693,12 +965,17 @@ public static class ConstructorIglesia
         return m;
     }
 
-    // Oscuridad ambiental: sin cielo, fondo negro.
+    // Interior en penumbra: la luz entra por los vitrales y el rosetón. Fondo negro, cámara de SeguirCamara.
     static void ConfigurarEscena()
     {
         RenderSettings.skybox = null;
         RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.14f, 0.10f, 0.20f);
+        RenderSettings.ambientLight = new Color(0.16f, 0.13f, 0.20f);
+        RenderSettings.fog = true;   // polvo en el aire
+        RenderSettings.fogMode = FogMode.Linear;
+        RenderSettings.fogColor = new Color(0.05f, 0.04f, 0.06f);
+        RenderSettings.fogStartDistance = 20f;
+        RenderSettings.fogEndDistance = 75f;
 
         foreach (var l in Object.FindObjectsByType<Light>())
         {
@@ -713,8 +990,6 @@ public static class ConstructorIglesia
         {
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Color.black;
-            cam.transform.position = new Vector3(0f, 30f, -12f);
-            cam.transform.rotation = Quaternion.Euler(65f, 0f, 0f);
         }
     }
 }
