@@ -1,17 +1,10 @@
 // Saatan Historia - Nivel I: La selva (laberinto).
-// Colocar en: Assets/Editor/ConstructorSelva.cs
-//
-// Construye el laberinto a partir de Assets/Mapas/selva_laberinto.png (1 píxel = 1 metro)
-// usando los modelos FBX de Assets/Art/LOD0:
-//   negro         -> borde del laberinto: fila de árboles + arbustos, con colisión.
-//   verde oscuro  -> bosque cerrado (islas y exterior): árboles de relleno, sin paso.
-//   verde         -> hierba alta (capim / helechos), se puede caminar entre ella.
-//   blanco        -> suelo del pasillo con decoración pequeña (piedras, pasto bajo).
-//   azul          -> inicio del jugador.      rosa -> salida del nivel.
-//
-// Menú: Saatan > Construir selva (Laberinto)
-// Para reconstruir NivelSelva completo (abre, construye, crea a Iktan y guarda):
-//       Saatan > Escenas > Reconstruir NivelSelva
+// Construye el laberinto desde Assets/Mapas/selva_laberinto.png (1 px = 1 m) con los FBX de Assets/Art/LOD2:
+//   negro = borde (árboles + arbustos, con colisión) | verde oscuro = bosque cerrado | verde = hierba alta
+//   blanco = pasillo (decoración pequeña) | azul = inicio | rosa = salida
+// Optimización: modelos LOD2, suelo en un solo quad con textura, colisiones con cajas,
+// y todo agrupado en zonas de ZONA x ZONA m que CargaSelva activa solo cerca del jugador.
+// Menú: Saatan > Construir selva (Laberinto)   |   Saatan > Escenas > Reconstruir NivelSelva
 
 using System.Collections.Generic;
 using UnityEditor;
@@ -21,741 +14,375 @@ using UnityEngine.Rendering;
 
 public static class ConstructorSelva
 {
-    enum Tipo { Piso, Limite, Pasto, Arbol, Tronco, Ruina, Columna, Trampa, Nahual, Rama, Trompos, Inicio, Salida }
-
     public const string MAPA = "Assets/Mapas/selva_laberinto.png";
-    const string ARTE = "Assets/Art/LOD0/";
-    const string CARPETA = "Assets/Niveles/Selva";
-    const string RAIZ = "Selva_Laberinto";
-    const int SEMILLA = 2026;
+    const string ARTE = "Assets/Art/LOD2/", CARPETA = "Assets/Niveles/Selva", RAIZ = "Selva_Laberinto";
+    const int ZONA = 16, SEMILLA = 2026;
+    const float ALTO_MURO = 4f;
 
-    // ---- Ajustes ----
-    const float ALTO_MURO = 4f;            // altura de la colisión invisible del borde
-    const float SEPARACION_ARBOLES = 4.2f; // distancia mínima entre troncos en el borde
-    const float SEPARACION_BOSQUE = 5.5f;  // distancia mínima entre troncos en el bosque cerrado
-    const int MAX_ARBOLES_GIGANTES = 3;    // el árbol "hero" es muy pesado
-    const float DENSIDAD_NIEBLA = 0.016f;
+    enum T { Vacio, Piso, Borde, Pasto, Bosque, Inicio, Salida }
 
-    static readonly (Color32 color, Tipo tipo)[] paleta =
+    static readonly Dictionary<Color32, T> paleta = new Dictionary<Color32, T>
     {
-        (new Color32(255, 255, 255, 255), Tipo.Piso),
-        (new Color32(0, 0, 0, 255), Tipo.Limite),
-        (new Color32(0, 170, 0, 255), Tipo.Pasto),
-        (new Color32(0, 90, 0, 255), Tipo.Arbol),
-        (new Color32(140, 80, 30, 255), Tipo.Tronco),
-        (new Color32(128, 128, 128, 255), Tipo.Ruina),
-        (new Color32(200, 200, 200, 255), Tipo.Columna),
-        (new Color32(0, 210, 210, 255), Tipo.Trampa),
-        (new Color32(230, 0, 0, 255), Tipo.Nahual),
-        (new Color32(255, 150, 0, 255), Tipo.Rama),
-        (new Color32(255, 220, 0, 255), Tipo.Trompos),
-        (new Color32(0, 100, 255, 255), Tipo.Inicio),
-        (new Color32(255, 105, 180, 255), Tipo.Salida),
+        { new Color32(255, 255, 255, 255), T.Piso },   { new Color32(0, 0, 0, 255), T.Borde },
+        { new Color32(0, 170, 0, 255), T.Pasto },      { new Color32(0, 90, 0, 255), T.Bosque },
+        { new Color32(0, 100, 255, 255), T.Inicio },   { new Color32(255, 105, 180, 255), T.Salida },
     };
 
-    // ---------------- Catálogo de modelos (alturas en metros; Iktan mide ~1.8 m) ----------------
+    // Modelo: archivo, altura final mínima y máxima (m), peso. Iktan mide ~1.8 m.
+    class Modelo { public string archivo; public float min, max, peso, alto; public GameObject prefab; }
+    static Modelo[] Lista(params (string, float, float, float)[] l) =>
+        System.Array.ConvertAll(l, m => new Modelo { archivo = m.Item1, min = m.Item2, max = m.Item3, peso = m.Item4 });
 
-    class Modelo
-    {
-        public string archivo;
-        public float min, max;      // altura final deseada
-        public float peso;          // probabilidad relativa dentro de su grupo
-        public GameObject prefab;
-        public float alto;          // altura original del FBX
-        public float radio;         // radio original de la copa / follaje
-    }
+    static readonly Modelo[] arboles = Lista(("acacia_australiana_01", 8, 10, 1), ("arvore_folhas_largas_01", 7, 9, 1.2f),
+        ("arvore_torta_floresta_01", 7, 9, 1), ("arvore_casca_rugosa_01", 9, 11, 0.8f), ("eucalipto_alto_01", 13, 16, 0.3f),
+        ("eucalipto_alto_02", 12, 15, 0.5f));
+    static readonly Modelo[] gigante = Lista(("arvore_copa_larga_hero_01", 12, 14, 1));
+    static readonly Modelo[] arbustos = Lista(("arbusto_arredondado_01", 1.6f, 2.2f, 1), ("arbusto_irregular_01", 1.8f, 2.5f, 1),
+        ("arbusto_folhas_largas_01", 1.2f, 1.7f, 0.8f), ("moita_seca_01", 1.2f, 1.6f, 0.4f),
+        ("samambaia_arborea_01", 2.8f, 3.6f, 0.6f), ("samambaia_larga_hero_01", 1.3f, 1.7f, 0.6f));
+    static readonly Modelo[] hierba = Lista(("capim_alto_estilizado_01", 1.3f, 1.7f, 1), ("samambaia_media_01", 0.8f, 1.1f, 0.3f));
+    static readonly Modelo[] plantas = Lista(("grama_baixa_x_01", 0.2f, 0.3f, 1), ("grama_media_x_01", 0.4f, 0.6f, 1),
+        ("folhagem_rasteira_01", 0.12f, 0.2f, 0.8f), ("samambaia_baixa_densa_01", 0.3f, 0.4f, 0.6f), ("planta_roteada_01", 0.7f, 0.9f, 0.3f));
+    static readonly Modelo[] piedras = Lista(("pedra_01", 0.5f, 0.8f, 1), ("pedra_02", 0.4f, 0.6f, 1), ("pedra_03", 0.4f, 0.6f, 1),
+        ("pedra_04", 0.8f, 1.2f, 0.5f), ("pedra_05", 1f, 1.5f, 0.4f));
 
-    static Modelo M(string archivo, float min, float max, float peso = 1f) =>
-        new Modelo { archivo = archivo, min = min, max = max, peso = peso };
-
-    static readonly Modelo[] arbolesBorde =
-    {
-        M("acacia_australiana_01", 8f, 10f, 1.0f),
-        M("arvore_folhas_largas_01", 7f, 9f, 1.2f),
-        M("arvore_torta_floresta_01", 7f, 9f, 1.0f),
-        M("arvore_casca_rugosa_01", 9f, 11f, 0.8f),
-        M("eucalipto_alto_02", 12f, 15f, 0.5f),
-    };
-
-    static readonly Modelo[] arbolesBosque =
-    {
-        M("acacia_australiana_01", 8f, 11f, 1.0f),
-        M("arvore_folhas_largas_01", 7f, 10f, 1.0f),
-        M("arvore_torta_floresta_01", 7f, 9f, 0.8f),
-        M("arvore_casca_rugosa_01", 10f, 12f, 0.8f),
-        M("eucalipto_alto_01", 13f, 16f, 0.6f),
-        M("eucalipto_alto_02", 12f, 15f, 0.6f),
-    };
-
-    static readonly Modelo arbolGigante = M("arvore_copa_larga_hero_01", 12f, 14f);
-
-    static readonly Modelo[] arbustos =
-    {
-        M("arbusto_arredondado_01", 1.6f, 2.2f, 1.0f),
-        M("arbusto_irregular_01", 1.8f, 2.5f, 1.0f),
-        M("arbusto_folhas_largas_01", 1.2f, 1.7f, 0.8f),
-        M("moita_seca_01", 1.2f, 1.6f, 0.4f),
-        M("samambaia_arborea_01", 2.8f, 3.6f, 0.6f),
-        M("samambaia_larga_hero_01", 1.3f, 1.7f, 0.6f),
-    };
-
-    static readonly Modelo[] hierbaAlta =
-    {
-        M("capim_alto_estilizado_01", 1.3f, 1.7f, 1.0f),
-        M("samambaia_media_01", 0.8f, 1.1f, 0.3f),
-        M("grama_media_x_01", 0.8f, 1.0f, 0.3f),
-    };
-
-    static readonly Modelo[] decoSuelo =
-    {
-        M("grama_baixa_x_01", 0.2f, 0.3f, 1.0f),
-        M("grama_media_x_01", 0.4f, 0.6f, 1.0f),
-        M("folhagem_rasteira_01", 0.12f, 0.2f, 0.8f),
-        M("samambaia_baixa_densa_01", 0.3f, 0.4f, 0.6f),
-        M("planta_roteada_01", 0.7f, 0.9f, 0.3f),
-    };
-
-    static readonly Modelo[] piedras =
-    {
-        M("pedra_01", 0.5f, 0.8f),
-        M("pedra_02", 0.4f, 0.6f),
-        M("pedra_03", 0.4f, 0.6f),
-        M("pedra_04", 0.8f, 1.2f, 0.5f),
-        M("pedra_05", 1.0f, 1.5f, 0.4f),
-    };
-
-    static Material matVoxel;
+    static T[,] mapa;
+    static int w, h;
     static System.Random rnd;
-
-    // ---------------- Menú ----------------
+    static Material matVoxel;
+    static Transform zonas;
+    static readonly Dictionary<Vector2Int, Transform> zonaDe = new Dictionary<Vector2Int, Transform>();
 
     [MenuItem("Saatan/Construir selva (Laberinto)")]
-    static void Construir()
+    static void Menu()
     {
-        if (EditorApplication.isPlaying)
-        {
-            EditorUtility.DisplayDialog("Saatan", "Sal del modo Play antes de construir el nivel.", "OK");
-            return;
-        }
-
-        var tex = Selection.activeObject as Texture2D;
-        if (tex == null) tex = AssetDatabase.LoadAssetAtPath<Texture2D>(MAPA);
-        if (tex == null)
-        {
-            EditorUtility.DisplayDialog("Saatan", "No se encontró " + MAPA + ".", "OK");
-            return;
-        }
-
-        ConstruirDesdeTextura(tex);
+        if (EditorApplication.isPlaying) return;
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(MAPA);
+        if (tex != null) ConstruirDesdeTextura(tex);
+        else EditorUtility.DisplayDialog("Saatan", "No se encontró " + MAPA, "OK");
     }
 
     public static void ConstruirDesdeTextura(Texture2D tex)
     {
-        try
-        {
-            Construir(tex);
-        }
-        finally
-        {
-            EditorUtility.ClearProgressBar();
-        }
+        try { Construir(tex); }
+        finally { EditorUtility.ClearProgressBar(); }
     }
-
-    // ---------------- Construcción ----------------
 
     static void Construir(Texture2D tex)
     {
-        string ruta = AssetDatabase.GetAssetPath(tex);
-        var imp = (TextureImporter)AssetImporter.GetAtPath(ruta);
-        if (!imp.isReadable || imp.textureCompression != TextureImporterCompression.Uncompressed ||
-            imp.npotScale != TextureImporterNPOTScale.None || imp.mipmapEnabled)
+        LeerMapa(tex);
+        rnd = new System.Random(SEMILLA);
+        if (!AssetDatabase.IsValidFolder(CARPETA)) AssetDatabase.CreateFolder("Assets/Niveles", "Selva");
+        Progreso("Modelos", 0f);
+        matVoxel = MaterialVoxel();
+        if (!CargarModelos()) return;
+
+        foreach (var viejo in new[] { RAIZ, "Selva_Detallada" })
+            if (GameObject.Find(viejo) is GameObject go) Object.DestroyImmediate(go);
+        var raiz = new GameObject(RAIZ).transform;
+        zonas = Hijo(raiz, "Zonas");
+        zonaDe.Clear();
+
+        Progreso("Suelo y colisiones", 0.1f);
+        Suelo(raiz);
+        Colisiones(raiz);
+
+        var troncos = new List<Vector3>();
+        var matas = new List<Vector3>();
+        int gigantes = 0;
+
+        Progreso("Árboles del borde", 0.3f);
+        foreach (var p in Celdas(T.Borde, 0.3f))
+            if (!Cerca(troncos, p, 4.2f)) { Poner(arboles, p, "Arbol"); troncos.Add(p); }
+
+        Progreso("Bosque", 0.5f);
+        foreach (var p in Celdas(T.Bosque, 0.45f))
+        {
+            bool grande = gigantes < 3 && Distancia(p, T.Borde, 7) > 6;
+            if (Cerca(troncos, p, grande ? 9f : 5.5f)) continue;
+            Poner(grande ? gigante : arboles, p, "Arbol");
+            troncos.Add(p);
+            if (grande) gigantes++;
+        }
+
+        Progreso("Arbustos", 0.65f);
+        foreach (var p in Celdas(T.Borde, 0.35f))
+            if (!Cerca(troncos, p, 2.2f) && !Cerca(matas, p, 1.8f)) { Poner(arbustos, p, "Arbusto"); matas.Add(p); }
+
+        Progreso("Hierba alta y decoración", 0.8f);
+        foreach (var p in Celdas(T.Pasto, 0.35f))
+            if (rnd.NextDouble() < 0.75) Poner(hierba, p, "Hierba");
+        foreach (var p in Celdas(T.Piso, 0.4f))
+        {
+            bool junto = Distancia(p, T.Borde, 1) <= 1;
+            double r = rnd.NextDouble();
+            if (junto && r < 0.04) Poner(piedras, p, "Piedra");
+            else if (junto ? r < 0.16 : r < 0.03) Poner(plantas, p, "Planta");
+        }
+
+        // Inicio y salida.
+        var ini = Celdas(T.Inicio, 0f);
+        if (ini.Count > 0) Hijo(raiz, "Inicio_Jugador").localPosition = ini[0];
+        var sal = Celdas(T.Salida, 0f);
+        if (sal.Count > 0)
+        {
+            Vector3 a = sal[0], b = sal[0];
+            foreach (var p in sal) { a = Vector3.Min(a, p); b = Vector3.Max(b, p); }
+            var meta = Hijo(raiz, "Meta_Salida");
+            meta.localPosition = (a + b) * 0.5f + Vector3.up;
+            var col = meta.gameObject.AddComponent<BoxCollider>();
+            col.isTrigger = true;
+            col.size = b - a + new Vector3(1f, 2f, 1f);
+            meta.gameObject.AddComponent<MetaNivel>();
+        }
+
+        ConfigurarEscena();
+        AssetDatabase.SaveAssets();
+        EditorSceneManager.MarkAllScenesDirty();
+        Debug.Log($"Selva creada ({w} x {h} m) en {zonas.childCount} zonas de {ZONA} m.");
+    }
+
+    // ---------------- Mapa ----------------
+
+    static void LeerMapa(Texture2D tex)
+    {
+        var imp = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex));
+        if (!imp.isReadable || imp.npotScale != TextureImporterNPOTScale.None)
         {
             imp.isReadable = true;
+            imp.mipmapEnabled = false;
             imp.filterMode = FilterMode.Point;
             imp.textureCompression = TextureImporterCompression.Uncompressed;
             imp.npotScale = TextureImporterNPOTScale.None;
-            imp.mipmapEnabled = false;
             imp.SaveAndReimport();
-            tex = AssetDatabase.LoadAssetAtPath<Texture2D>(ruta);
+            tex = AssetDatabase.LoadAssetAtPath<Texture2D>(MAPA);
         }
 
-        Color32[] px = tex.GetPixels32();
-        int w = tex.width, h = tex.height;
-
-        var mapa = new int[w, h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                Color32 p = px[y * w + x];
-                mapa[x, y] = p.a < 128 ? -1 : (int)Clasificar(p);
-            }
-
-        CrearCarpetas();
-        rnd = new System.Random(SEMILLA);
-
-        Progreso("Preparando materiales", 0.02f);
-        matVoxel = MaterialVoxel();
-        UsarMaterialEnFBX(matVoxel);
-        if (!CargarModelos()) return;
-
-        foreach (string viejo in new[] { RAIZ, "Selva_Detallada" })
-        {
-            var go = GameObject.Find(viejo);
-            if (go != null) Object.DestroyImmediate(go);
-        }
-
-        var raiz = new GameObject(RAIZ).transform;
-
-        Progreso("Suelo y colisiones", 0.1f);
-        Suelo(raiz, mapa, w, h);
-        Colisiones(raiz, mapa, w, h);
-
-        var arboles = Grupo(raiz, "Arboles");
-        var arbustosG = Grupo(raiz, "Arbustos");
-        var hierba = Grupo(raiz, "Hierba_Alta");
-        var deco = Grupo(raiz, "Decoracion");
-
-        var troncos = new List<Vector3>();   // posiciones de árboles ya puestos
-
-        // ---- 1. Árboles del borde (siguen las líneas negras del boceto) ----
-        Progreso("Árboles del borde", 0.25f);
-        foreach (var c in Celdas(mapa, w, h, Tipo.Limite, true))
-        {
-            Vector3 p = Pos(c.x, c.y, w, h) + Jitter(0.3f);
-            if (Cerca(troncos, p, SEPARACION_ARBOLES)) continue;
-            Poner(Elegir(arbolesBorde), arboles, p, "Arbol");
-            troncos.Add(p);
-        }
-
-        // ---- 2. Bosque cerrado (dentro de las islas y alrededor) ----
-        Progreso("Bosque", 0.45f);
-        int gigantes = 0;
-        foreach (var c in Celdas(mapa, w, h, Tipo.Arbol, true))
-        {
-            Vector3 p = Pos(c.x, c.y, w, h) + Jitter(0.45f);
-            bool gigante = gigantes < MAX_ARBOLES_GIGANTES && arbolGigante.prefab != null &&
-                           DistanciaA(mapa, w, h, c.x, c.y, Tipo.Limite, 7) > 6;
-            float sep = gigante ? 9f : SEPARACION_BOSQUE;
-            if (Cerca(troncos, p, sep)) continue;
-
-            if (gigante)
-            {
-                Poner(arbolGigante, arboles, p, "Arbol_Gigante");
-                gigantes++;
-            }
-            else
-            {
-                Poner(Elegir(arbolesBosque), arboles, p, "Arbol");
-            }
-            troncos.Add(p);
-        }
-
-        // ---- 3. Arbustos para tapar los huecos entre troncos del borde ----
-        Progreso("Arbustos", 0.6f);
-        var matas = new List<Vector3>();
-        foreach (var c in Celdas(mapa, w, h, Tipo.Limite, true))
-        {
-            Vector3 p = Pos(c.x, c.y, w, h) + Jitter(0.35f);
-            if (Cerca(troncos, p, 2.2f) || Cerca(matas, p, 1.7f)) continue;
-            Poner(Elegir(arbustos), arbustosG, p, "Arbusto");
-            matas.Add(p);
-        }
-        foreach (var c in Celdas(mapa, w, h, Tipo.Arbol, true))
-        {
-            if (rnd.NextDouble() > 0.12) continue;
-            Vector3 p = Pos(c.x, c.y, w, h) + Jitter(0.4f);
-            if (Cerca(troncos, p, 2f) || Cerca(matas, p, 2.5f)) continue;
-            Poner(Elegir(arbustos), arbustosG, p, "Arbusto");
-            matas.Add(p);
-        }
-
-        // ---- 4. Hierba alta (zonas verdes del boceto) ----
-        Progreso("Hierba alta", 0.75f);
-        foreach (var c in Celdas(mapa, w, h, Tipo.Pasto, false))
-        {
-            Vector3 b = Pos(c.x, c.y, w, h);
-            Poner(Elegir(hierbaAlta), hierba, b + Jitter(0.3f), "Hierba");
-            if (rnd.NextDouble() < 0.35)
-                Poner(hierbaAlta[0], hierba, b + Jitter(0.45f), "Hierba");
-        }
-
-        // ---- 5. Decoración del suelo de los pasillos (sin colisión) ----
-        Progreso("Decoración", 0.88f);
-        foreach (var c in Celdas(mapa, w, h, Tipo.Piso, false))
-        {
-            Vector3 p = Pos(c.x, c.y, w, h) + Jitter(0.4f);
-            bool juntoAlBorde = DistanciaA(mapa, w, h, c.x, c.y, Tipo.Limite, 1) <= 1;
-            double r = rnd.NextDouble();
-
-            if (juntoAlBorde && r < 0.05)
-                Poner(Elegir(piedras), deco, p, "Piedra");
-            else if (juntoAlBorde && r < 0.22)
-                Poner(Elegir(decoSuelo), deco, p, "Planta");
-            else if (!juntoAlBorde && r < 0.05)
-                Poner(Elegir(decoSuelo, 2), deco, p, "Pasto_Bajo");
-        }
-
-        // ---- 6. Inicio y salida ----
-        Vector3 salidaMin = Vector3.positiveInfinity, salidaMax = Vector3.negativeInfinity;
-        bool haySalida = false;
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                if (mapa[x, y] == (int)Tipo.Inicio)
-                {
-                    var ini = new GameObject("Inicio_Jugador");
-                    ini.transform.SetParent(raiz, false);
-                    ini.transform.localPosition = Pos(x, y, w, h);
-                    ini.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
-                }
-                else if (mapa[x, y] == (int)Tipo.Salida)
-                {
-                    Vector3 p = Pos(x, y, w, h);
-                    salidaMin = Vector3.Min(salidaMin, p);
-                    salidaMax = Vector3.Max(salidaMax, p);
-                    haySalida = true;
-                }
-            }
-
-        if (haySalida)
-        {
-            var meta = new GameObject("Meta_Salida");
-            meta.transform.SetParent(raiz, false);
-            meta.transform.localPosition = (salidaMin + salidaMax) * 0.5f + Vector3.up;
-            var col = meta.AddComponent<BoxCollider>();
-            col.isTrigger = true;
-            col.size = new Vector3(salidaMax.x - salidaMin.x + 1f, 2f, salidaMax.z - salidaMin.z + 1f);
-            meta.AddComponent<MetaNivel>();
-        }
-
-        Progreso("Escena", 0.97f);
-        ConfigurarEscena(arboles);
-
-        AssetDatabase.SaveAssets();
-        EditorSceneManager.MarkAllScenesDirty();
-        Selection.activeGameObject = raiz.gameObject;
-
-        Debug.Log("Laberinto de la selva creado (" + w + " x " + h + " m): " +
-                  arboles.childCount + " árboles, " + arbustosG.childCount + " arbustos, " +
-                  hierba.childCount + " matas de hierba alta, " + deco.childCount + " decoraciones.");
+        var px = tex.GetPixels32();
+        w = tex.width; h = tex.height;
+        mapa = new T[w, h];
+        for (int i = 0; i < px.Length; i++)
+            mapa[i % w, i / w] = px[i].a < 128 ? T.Vacio : paleta.TryGetValue(px[i], out var t) ? t : T.Piso;
     }
 
-    // ---------------- Suelo (mallas combinadas) ----------------
+    static Vector3 Pos(int x, int y) => new Vector3(x - w / 2f + 0.5f, 0f, y - h / 2f + 0.5f);
 
-    static void Suelo(Transform raiz, int[,] mapa, int w, int h)
+    static T En(Vector3 p)
     {
-        var colores = new Dictionary<string, Color>
-        {
-            { "TierraA", new Color(0.20f, 0.15f, 0.09f) },
-            { "TierraB", new Color(0.17f, 0.13f, 0.08f) },
-            { "Musgo", new Color(0.16f, 0.30f, 0.11f) },
-            { "Hojarasca", new Color(0.12f, 0.10f, 0.06f) },
-        };
+        int x = Mathf.FloorToInt(p.x + w / 2f), y = Mathf.FloorToInt(p.z + h / 2f);
+        return x < 0 || y < 0 || x >= w || y >= h ? T.Vacio : mapa[x, y];
+    }
 
-        var partes = new Dictionary<string, MallaSimple>();
-        foreach (var k in colores.Keys) partes[k] = new MallaSimple();
+    // Posiciones (con un poco de desorden) de las celdas de un tipo, en orden aleatorio.
+    static List<Vector3> Celdas(T t, float desorden)
+    {
+        var l = new List<Vector3>();
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (mapa[x, y] == t)
+                    l.Add(Pos(x, y) + new Vector3(Azar(desorden), 0f, Azar(desorden)));
+        for (int i = l.Count - 1; i > 0; i--) { int j = rnd.Next(i + 1); (l[i], l[j]) = (l[j], l[i]); }
+        return l;
+    }
+
+    static float Azar(float a) => ((float)rnd.NextDouble() * 2f - 1f) * a;
+
+    static bool Cerca(List<Vector3> puntos, Vector3 p, float d)
+    {
+        foreach (var q in puntos) if ((q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z) < d * d) return true;
+        return false;
+    }
+
+    // Distancia en celdas (anillos cuadrados) a la celda más cercana de un tipo, hasta 'max'.
+    static int Distancia(Vector3 p, T t, int max)
+    {
+        for (int r = 0; r <= max; r++)
+            for (int dy = -r; dy <= r; dy++)
+                for (int dx = -r; dx <= r; dx++)
+                    if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy)) == r && En(p + new Vector3(dx, 0, dy)) == t) return r;
+        return max + 1;
+    }
+
+    // ---------------- Suelo y colisiones ----------------
+
+    // Un solo quad con una textura de w x h (1 píxel por celda): 1 draw call para todo el suelo.
+    static void Suelo(Transform raiz)
+    {
+        Color tierraA = new Color(0.20f, 0.15f, 0.09f), tierraB = new Color(0.17f, 0.13f, 0.08f);
+        Color musgo = new Color(0.16f, 0.30f, 0.11f), hojarasca = new Color(0.12f, 0.10f, 0.06f);
+
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Tex_Suelo" };
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                tex.SetPixel(x, y, mapa[x, y] == T.Pasto ? musgo
+                    : mapa[x, y] == T.Piso || mapa[x, y] == T.Inicio || mapa[x, y] == T.Salida ? ((x * 7 + y * 13) % 5 < 2 ? tierraB : tierraA)
+                    : hojarasca);
+        tex.Apply();
+        Guardar(tex, CARPETA + "/Tex_Suelo.asset");
+
+        var mat = Guardar(new Material(Shader.Find("Universal Render Pipeline/Lit")), CARPETA + "/Mat_Suelo.mat");
+        mat.SetTexture("_BaseMap", tex);
+        mat.SetFloat("_Smoothness", 0.05f);
+
+        var suelo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        suelo.name = "Suelo";
+        Object.DestroyImmediate(suelo.GetComponent<Collider>());
+        suelo.transform.SetParent(raiz, false);
+        suelo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+        suelo.transform.localScale = new Vector3(w, h, 1f);
+        var mr = suelo.GetComponent<MeshRenderer>();
+        mr.sharedMaterial = mat;
+        mr.shadowCastingMode = ShadowCastingMode.Off;
+    }
+
+    // Una caja para el suelo y una por cada tramo seguido de borde en cada fila.
+    static void Colisiones(Transform raiz)
+    {
+        var go = Hijo(raiz, "Colisiones").gameObject;
+        go.isStatic = true;
+        var piso = go.AddComponent<BoxCollider>();
+        piso.center = new Vector3(0f, -0.25f, 0f);
+        piso.size = new Vector3(w, 0.5f, h);
 
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
-                int t = mapa[x, y];
-                if (t < 0) continue;
-
-                string mat;
-                if (t == (int)Tipo.Pasto) mat = "Musgo";
-                else if (t == (int)Tipo.Arbol || t == (int)Tipo.Limite) mat = "Hojarasca";
-                else mat = ((x * 7 + y * 13) % 5 < 2) ? "TierraB" : "TierraA";
-
-                Vector3 p = Pos(x, y, w, h);
-                partes[mat].Quad(p, 1f);
-            }
-
-        var piso = Grupo(raiz, "Piso");
-        foreach (var kv in partes)
-        {
-            if (kv.Value.Vacia) continue;
-            var go = new GameObject("Piso_" + kv.Key);
-            go.transform.SetParent(piso, false);
-            go.AddComponent<MeshFilter>().sharedMesh = kv.Value.Guardar("Lab_Piso_" + kv.Key, true);
-            var mr = go.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = MaterialLit(kv.Key, colores[kv.Key]);
-            mr.shadowCastingMode = ShadowCastingMode.Off;
-        }
-    }
-
-    static void Colisiones(Transform raiz, int[,] mapa, int w, int h)
-    {
-        var go = new GameObject("Colisiones");
-        go.transform.SetParent(raiz, false);
-
-        // Suelo: una sola caja que cubre todo el mapa.
-        var suelo = go.AddComponent<BoxCollider>();
-        suelo.center = new Vector3(0f, -0.25f, 0f);
-        suelo.size = new Vector3(w, 0.5f, h);
-
-        // Bordes: cajas de ALTO_MURO uniendo celdas seguidas de cada fila.
-        var muro = new MallaSimple();
-        for (int y = 0; y < h; y++)
-        {
-            int x = 0;
-            while (x < w)
-            {
-                if (!Bloquea(mapa[x, y])) { x++; continue; }
+                if (mapa[x, y] != T.Borde) continue;
                 int x0 = x;
-                while (x < w && Bloquea(mapa[x, y])) x++;
-
-                Vector3 a = Pos(x0, y, w, h);
-                Vector3 b = Pos(x - 1, y, w, h);
-                muro.Caja(new Vector3((a.x + b.x) * 0.5f, ALTO_MURO * 0.5f, a.z),
-                          new Vector3(b.x - a.x + 1f, ALTO_MURO, 1f));
+                while (x + 1 < w && mapa[x + 1, y] == T.Borde) x++;
+                var c = go.AddComponent<BoxCollider>();
+                c.center = (Pos(x0, y) + Pos(x, y)) * 0.5f + Vector3.up * ALTO_MURO * 0.5f;
+                c.size = new Vector3(x - x0 + 1, ALTO_MURO, 1f);
             }
-        }
-
-        var bordes = new GameObject("Bordes_Invisibles");
-        bordes.transform.SetParent(go.transform, false);
-        bordes.AddComponent<MeshCollider>().sharedMesh = muro.Guardar("Lab_Colision", false);
     }
-
-    // Solo el borde necesita colisión: el bosque está siempre detrás de él.
-    static bool Bloquea(int t) => t == (int)Tipo.Limite;
 
     // ---------------- Modelos ----------------
 
     static bool CargarModelos()
     {
-        var todos = new List<Modelo>();
-        todos.AddRange(arbolesBorde);
-        todos.AddRange(arbolesBosque);
-        todos.Add(arbolGigante);
-        todos.AddRange(arbustos);
-        todos.AddRange(hierbaAlta);
-        todos.AddRange(decoSuelo);
-        todos.AddRange(piedras);
-
         var faltan = new List<string>();
-        foreach (var m in todos)
-        {
-            m.prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ARTE + m.archivo + "_LOD0.fbx");
-            if (m.prefab == null) { faltan.Add(m.archivo); continue; }
+        foreach (var lista in new[] { arboles, gigante, arbustos, hierba, plantas, piedras })
+            foreach (var m in lista)
+            {
+                string ruta = ARTE + m.archivo + "_LOD2.fbx";
+                if (AssetImporter.GetAtPath(ruta) is ModelImporter imp)
+                    foreach (var o in AssetDatabase.LoadAllAssetRepresentationsAtPath(ruta))
+                        if (o is Material) { imp.AddRemap(new AssetImporter.SourceAssetIdentifier(o), matVoxel); imp.SaveAndReimport(); break; }
 
-            // Mide el modelo tal como se importa (con la rotación del FBX incluida).
-            var tmp = (GameObject)PrefabUtility.InstantiatePrefab(m.prefab);
-            tmp.transform.position = Vector3.zero;
-            var rs = tmp.GetComponentsInChildren<Renderer>();
-            Bounds b = rs.Length > 0 ? rs[0].bounds : new Bounds(Vector3.zero, Vector3.one);
-            for (int i = 1; i < rs.Length; i++) b.Encapsulate(rs[i].bounds);
-            Object.DestroyImmediate(tmp);
+                m.prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ruta);
+                if (m.prefab == null) { faltan.Add(m.archivo); continue; }
 
-            m.alto = Mathf.Max(b.size.y, 0.01f);
-            m.radio = Mathf.Max(b.extents.x, b.extents.z);
-        }
+                var tmp = (GameObject)PrefabUtility.InstantiatePrefab(m.prefab);
+                tmp.transform.position = Vector3.zero;
+                m.alto = Mathf.Max(tmp.GetComponentInChildren<Renderer>().bounds.size.y, 0.01f);
+                Object.DestroyImmediate(tmp);
+            }
 
-        if (faltan.Count > 0)
-        {
-            EditorUtility.DisplayDialog("Saatan",
-                "Faltan estos modelos en " + ARTE + ":\n\n" + string.Join("\n", faltan), "OK");
-            return false;
-        }
-        return true;
+        if (faltan.Count == 0) return true;
+        EditorUtility.DisplayDialog("Saatan", "Faltan modelos en " + ARTE + ":\n" + string.Join("\n", faltan), "OK");
+        return false;
     }
 
-    static GameObject Poner(Modelo m, Transform padre, Vector3 pos, string nombre)
+    static void Poner(Modelo[] lista, Vector3 pos, string nombre)
     {
-        var go = (GameObject)PrefabUtility.InstantiatePrefab(m.prefab, padre);
-        go.name = nombre + "_" + m.archivo;
-
-        float alto = Mathf.Lerp(m.min, m.max, (float)rnd.NextDouble());
-        float k = alto / m.alto;
-
-        Quaternion baseRot = m.prefab.transform.localRotation;
-        Vector3 baseEsc = m.prefab.transform.localScale;
-
-        go.transform.localPosition = pos;
-        go.transform.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f) * baseRot;
-        go.transform.localScale = baseEsc * k;
-
-        foreach (var r in go.GetComponentsInChildren<MeshRenderer>())
-        {
-            var mats = r.sharedMaterials;
-            bool cambiar = false;
-            for (int i = 0; i < mats.Length; i++)
-                if (mats[i] != matVoxel) { mats[i] = matVoxel; cambiar = true; }
-            if (cambiar) r.sharedMaterials = mats;
-            r.shadowCastingMode = ShadowCastingMode.On;
-            r.lightProbeUsage = LightProbeUsage.Off;
-            r.reflectionProbeUsage = ReflectionProbeUsage.Off;
-        }
-        return go;
-    }
-
-    static Modelo Elegir(Modelo[] lista, int maxIndice = int.MaxValue)
-    {
-        int n = Mathf.Min(lista.Length, maxIndice);
+        // Elegir según el peso.
         float total = 0f;
-        for (int i = 0; i < n; i++) total += lista[i].peso;
+        foreach (var x in lista) total += x.peso;
         float r = (float)rnd.NextDouble() * total;
-        for (int i = 0; i < n; i++)
+        Modelo m = lista[lista.Length - 1];
+        foreach (var x in lista) if ((r -= x.peso) <= 0f) { m = x; break; }
+
+        var zona = Zona(pos);
+        var go = (GameObject)PrefabUtility.InstantiatePrefab(m.prefab, zona);
+        go.name = nombre + "_" + m.archivo;
+        var t = go.transform;
+        t.localPosition = pos - zona.localPosition;
+        t.localRotation = Quaternion.Euler(0f, (float)rnd.NextDouble() * 360f, 0f) * m.prefab.transform.localRotation;
+        t.localScale = m.prefab.transform.localScale * (Mathf.Lerp(m.min, m.max, (float)rnd.NextDouble()) / m.alto);
+
+        foreach (var mr in go.GetComponentsInChildren<MeshRenderer>())
         {
-            r -= lista[i].peso;
-            if (r <= 0f) return lista[i];
+            if (mr.sharedMaterial != matVoxel) mr.sharedMaterial = matVoxel;
+            mr.shadowCastingMode = ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+            mr.lightProbeUsage = LightProbeUsage.Off;
+            mr.reflectionProbeUsage = ReflectionProbeUsage.Off;
         }
-        return lista[n - 1];
     }
 
-    // ---------------- Materiales ----------------
+    static Transform Zona(Vector3 p)
+    {
+        var k = new Vector2Int(Mathf.FloorToInt((p.x + w / 2f) / ZONA), Mathf.FloorToInt((p.z + h / 2f) / ZONA));
+        if (zonaDe.TryGetValue(k, out var z)) return z;
+        z = Hijo(zonas, $"Zona_{k.x}_{k.y}");
+        z.localPosition = new Vector3((k.x + 0.5f) * ZONA - w / 2f, 0f, (k.y + 0.5f) * ZONA - h / 2f);
+        return zonaDe[k] = z;
+    }
 
+    // ---------------- Materiales y escena ----------------
+
+    // Los FBX guardan el color en los vértices: se usa el shader Saatan/VegetacionVoxel.
     static Material MaterialVoxel()
     {
-        string ruta = CARPETA + "/Mat_Vegetacion_Voxel.mat";
-
         Shader sh = Shader.Find("Saatan/VegetacionVoxel");
-        if (sh == null || ShaderUtil.ShaderHasError(sh))
-        {
-            Debug.LogWarning("El shader Saatan/VegetacionVoxel no compiló; se usa Particles/Simple Lit (colores de vértice).");
-            sh = Shader.Find("Universal Render Pipeline/Particles/Simple Lit");
-        }
-
+        if (sh == null || ShaderUtil.ShaderHasError(sh)) sh = Shader.Find("Universal Render Pipeline/Particles/Simple Lit");
+        string ruta = CARPETA + "/Mat_Vegetacion_Voxel.mat";
         var m = AssetDatabase.LoadAssetAtPath<Material>(ruta);
-        if (m == null)
-        {
-            m = new Material(sh);
-            AssetDatabase.CreateAsset(m, ruta);
-        }
-        else if (m.shader != sh)
-        {
-            m.shader = sh;
-        }
-
+        if (m == null) m = Guardar(new Material(sh), ruta);
+        m.shader = sh;
         m.enableInstancing = true;
         EditorUtility.SetDirty(m);
         return m;
     }
 
-    // Hace que todos los FBX de Assets/Art usen el material voxel en vez del que traen.
-    static void UsarMaterialEnFBX(Material mat)
-    {
-        foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { "Assets/Art" }))
-        {
-            string ruta = AssetDatabase.GUIDToAssetPath(guid);
-            var imp = AssetImporter.GetAtPath(ruta) as ModelImporter;
-            if (imp == null) continue;
-
-            var mapa = imp.GetExternalObjectMap();
-            bool cambio = false;
-
-            foreach (var o in AssetDatabase.LoadAllAssetRepresentationsAtPath(ruta))
-            {
-                if (!(o is Material)) continue;
-                var id = new AssetImporter.SourceAssetIdentifier(typeof(Material), o.name);
-                if (mapa.TryGetValue(id, out var actual) && actual == mat) continue;
-                imp.AddRemap(id, mat);
-                cambio = true;
-            }
-
-            // Si los materiales ya estaban remapeados no aparecen como sub-asset: revisa el nombre conocido.
-            var voxel = new AssetImporter.SourceAssetIdentifier(typeof(Material), "Floresta_Voxel");
-            if (mapa.TryGetValue(voxel, out var previo) && previo != mat)
-            {
-                imp.AddRemap(voxel, mat);
-                cambio = true;
-            }
-
-            if (cambio) imp.SaveAndReimport();
-        }
-    }
-
-    static Material MaterialLit(string nombre, Color color)
-    {
-        string ruta = CARPETA + "/Mat_" + nombre + ".mat";
-        var m = AssetDatabase.LoadAssetAtPath<Material>(ruta);
-        if (m == null)
-        {
-            Shader sh = Shader.Find("Universal Render Pipeline/Lit");
-            if (sh == null) sh = Shader.Find("Standard");
-            m = new Material(sh);
-            AssetDatabase.CreateAsset(m, ruta);
-        }
-        m.color = color;
-        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", color);
-        if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.05f);
-        EditorUtility.SetDirty(m);
-        return m;
-    }
-
-    // ---------------- Escena ----------------
-
-    static void ConfigurarEscena(Transform arboles)
+    static void ConfigurarEscena()
     {
         Color niebla = new Color(0.10f, 0.20f, 0.13f);
-
         RenderSettings.skybox = null;
         RenderSettings.ambientMode = AmbientMode.Flat;
         RenderSettings.ambientLight = new Color(0.30f, 0.36f, 0.30f);
+        // Neblina ligera: la cámara está a ~22 m de Iktan; lo que está a más de ~55 m se pierde en ella.
         RenderSettings.fog = true;
-        RenderSettings.fogMode = FogMode.ExponentialSquared;
+        RenderSettings.fogMode = FogMode.Linear;
         RenderSettings.fogColor = niebla;
-        RenderSettings.fogDensity = DENSIDAD_NIEBLA;
+        RenderSettings.fogStartDistance = 28f;
+        RenderSettings.fogEndDistance = 58f;
 
         foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
-        {
-            if (l.type != LightType.Directional) continue;
-            l.intensity = 0.9f;
-            l.color = new Color(1f, 0.95f, 0.80f);
-            l.shadows = LightShadows.None;
-            l.transform.rotation = Quaternion.Euler(55f, -30f, 0f);
-        }
+            if (l.type == LightType.Directional)
+            {
+                l.intensity = 0.9f;
+                l.color = new Color(1f, 0.95f, 0.8f);
+                l.shadows = LightShadows.None;
+                l.transform.rotation = Quaternion.Euler(55f, -30f, 0f);
+            }
 
         var cam = Camera.main;
-        if (cam != null)
-        {
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = niebla;
-            cam.farClipPlane = 200f;
-            cam.transform.rotation = Quaternion.Euler(65f, 0f, 0f);
-
-            var ocultar = cam.GetComponent<OcultarCopas>();
-            if (ocultar == null) ocultar = cam.gameObject.AddComponent<OcultarCopas>();
-            ocultar.arboles = arboles;
-        }
+        if (cam == null) return;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = niebla;
+        cam.farClipPlane = 60f;
+        cam.transform.rotation = Quaternion.Euler(65f, 0f, 0f);
+        var carga = cam.GetComponent<CargaSelva>();
+        if (carga == null) carga = cam.gameObject.AddComponent<CargaSelva>();
+        carga.zonas = zonas;
     }
 
     // ---------------- Utilidades ----------------
 
-    static void CrearCarpetas()
-    {
-        if (!AssetDatabase.IsValidFolder("Assets/Niveles")) AssetDatabase.CreateFolder("Assets", "Niveles");
-        if (!AssetDatabase.IsValidFolder(CARPETA)) AssetDatabase.CreateFolder("Assets/Niveles", "Selva");
-    }
-
-    static Transform Grupo(Transform padre, string nombre)
+    static Transform Hijo(Transform padre, string nombre)
     {
         var t = new GameObject(nombre).transform;
         t.SetParent(padre, false);
         return t;
     }
 
-    static Vector3 Pos(int x, int y, int w, int h) =>
-        new Vector3(x - w / 2f + 0.5f, 0f, y - h / 2f + 0.5f);
-
-    static Vector3 Jitter(float a) =>
-        new Vector3(((float)rnd.NextDouble() * 2f - 1f) * a, 0f, ((float)rnd.NextDouble() * 2f - 1f) * a);
-
-    // Celdas de un tipo; en orden aleatorio si se pide (para que los árboles no queden en filas).
-    static List<Vector2Int> Celdas(int[,] mapa, int w, int h, Tipo t, bool mezclar)
+    static A Guardar<A>(A asset, string ruta) where A : Object
     {
-        var l = new List<Vector2Int>();
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                if (mapa[x, y] == (int)t) l.Add(new Vector2Int(x, y));
-
-        if (mezclar)
-            for (int i = l.Count - 1; i > 0; i--)
-            {
-                int j = rnd.Next(i + 1);
-                (l[i], l[j]) = (l[j], l[i]);
-            }
-        return l;
+        AssetDatabase.DeleteAsset(ruta);
+        AssetDatabase.CreateAsset(asset, ruta);
+        return asset;
     }
 
-    static bool Cerca(List<Vector3> puntos, Vector3 p, float dist)
-    {
-        float d2 = dist * dist;
-        foreach (var q in puntos)
-        {
-            float dx = q.x - p.x, dz = q.z - p.z;
-            if (dx * dx + dz * dz < d2) return true;
-        }
-        return false;
-    }
-
-    // Distancia (en celdas, cuadrada) a la celda más cercana de un tipo, hasta 'max'.
-    static int DistanciaA(int[,] mapa, int w, int h, int cx, int cy, Tipo t, int max)
-    {
-        for (int r = 0; r <= max; r++)
-            for (int y = cy - r; y <= cy + r; y++)
-                for (int x = cx - r; x <= cx + r; x++)
-                {
-                    if (x < 0 || y < 0 || x >= w || y >= h) continue;
-                    if (Mathf.Max(Mathf.Abs(x - cx), Mathf.Abs(y - cy)) != r) continue;
-                    if (mapa[x, y] == (int)t) return r;
-                }
-        return max + 1;
-    }
-
-    static void Progreso(string paso, float t) =>
-        EditorUtility.DisplayProgressBar("Saatan - Selva", paso, t);
-
-    static Tipo Clasificar(Color32 p)
-    {
-        Tipo mejor = Tipo.Piso;
-        int mejorDist = int.MaxValue;
-        foreach (var (c, t) in paleta)
-        {
-            int dr = p.r - c.r, dg = p.g - c.g, db = p.b - c.b;
-            int d = dr * dr + dg * dg + db * db;
-            if (d < mejorDist) { mejorDist = d; mejor = t; }
-        }
-        return mejor;
-    }
-
-    // Malla armada a mano (cuadros para el piso, cajas para la colisión).
-    class MallaSimple
-    {
-        readonly List<Vector3> v = new List<Vector3>();
-        readonly List<Vector3> n = new List<Vector3>();
-        readonly List<Vector2> uv = new List<Vector2>();
-        readonly List<int> tri = new List<int>();
-
-        public bool Vacia => v.Count == 0;
-
-        public void Quad(Vector3 c, float lado)
-        {
-            float s = lado * 0.5f;
-            int i = v.Count;
-            v.Add(c + new Vector3(-s, 0f, -s));
-            v.Add(c + new Vector3(-s, 0f, s));
-            v.Add(c + new Vector3(s, 0f, s));
-            v.Add(c + new Vector3(s, 0f, -s));
-            for (int k = 0; k < 4; k++) n.Add(Vector3.up);
-            uv.Add(new Vector2(0, 0)); uv.Add(new Vector2(0, 1)); uv.Add(new Vector2(1, 1)); uv.Add(new Vector2(1, 0));
-            tri.AddRange(new[] { i, i + 1, i + 2, i, i + 2, i + 3 });
-        }
-
-        public void Caja(Vector3 c, Vector3 tam)
-        {
-            Vector3 e = tam * 0.5f;
-            int i = v.Count;
-            for (int k = 0; k < 8; k++)
-            {
-                v.Add(c + new Vector3((k & 1) == 0 ? -e.x : e.x, (k & 2) == 0 ? -e.y : e.y, (k & 4) == 0 ? -e.z : e.z));
-                n.Add(Vector3.up);
-                uv.Add(Vector2.zero);
-            }
-            int[] caras =
-            {
-                0, 2, 3, 0, 3, 1,   // -z
-                4, 5, 7, 4, 7, 6,   // +z
-                0, 4, 6, 0, 6, 2,   // -x
-                1, 3, 7, 1, 7, 5,   // +x
-                0, 1, 5, 0, 5, 4,   // -y
-                2, 6, 7, 2, 7, 3,   // +y
-            };
-            foreach (int k in caras) tri.Add(i + k);
-        }
-
-        public Mesh Guardar(string nombre, bool visual)
-        {
-            var m = new Mesh { name = nombre, indexFormat = IndexFormat.UInt32 };
-            m.SetVertices(v);
-            if (visual) { m.SetNormals(n); m.SetUVs(0, uv); }
-            m.SetTriangles(tri, 0);
-            if (!visual) m.RecalculateNormals();
-            m.RecalculateBounds();
-
-            string ruta = CARPETA + "/Malla_" + nombre + ".asset";
-            if (AssetDatabase.LoadAssetAtPath<Mesh>(ruta) != null) AssetDatabase.DeleteAsset(ruta);
-            AssetDatabase.CreateAsset(m, ruta);
-            return m;
-        }
-    }
+    static void Progreso(string paso, float t) => EditorUtility.DisplayProgressBar("Saatan - Selva", paso, t);
 }
