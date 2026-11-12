@@ -4,12 +4,15 @@
 //
 // Menú: Saatan > Escenas > Crear menú principal y nivel Selva
 //   - Assets/Scenes/MenuPrincipal.unity : título + botón "Jugar".
-//   - Assets/Scenes/Nivel_Selva.unity   : la selva construida desde selva_detallada.png
+//   - Assets/Scenes/NivelSelva.unity    : el laberinto de la selva (selva_laberinto.png)
 //                                          con el jugador de prueba (Iktan).
 //   - Las agrega a la lista de escenas del Build (el menú queda en el índice 0).
 //
-// El botón "Jugar" llama a CambiarEscena.CargarEscena("Nivel_Selva") desde su
+// El botón "Jugar" llama a CambiarEscena.CargarEscena("NivelSelva") desde su
 // evento On Click (), tal como se configura a mano en el video de apoyo.
+//
+// Menú: Saatan > Escenas > Reconstruir NivelSelva
+//   Abre NivelSelva.unity, vuelve a construir el laberinto, coloca a Iktan y guarda.
 
 using System.Collections.Generic;
 using UnityEditor;
@@ -26,8 +29,8 @@ public static class ConstructorEscenas
 {
     public const string CARPETA = "Assets/Scenes";
     public const string ESCENA_MENU = "MenuPrincipal";
-    public const string ESCENA_SELVA = "Nivel_Selva";
-    const string MAPA_SELVA = "Assets/Mapas/selva_detallada.png";
+    public const string ESCENA_SELVA = "NivelSelva";
+    const string MAPA_SELVA = ConstructorSelva.MAPA;
 
     static string Ruta(string nombre) => CARPETA + "/" + nombre + ".unity";
 
@@ -67,6 +70,30 @@ public static class ConstructorEscenas
         if (!Preparar()) return;
         CrearNivelSelva();
         AgregarAlBuild();
+    }
+
+    [MenuItem("Saatan/Escenas/Reconstruir NivelSelva")]
+    static void ReconstruirSelva()
+    {
+        if (!Preparar()) return;
+
+        var mapa = AssetDatabase.LoadAssetAtPath<Texture2D>(MAPA_SELVA);
+        if (mapa == null)
+        {
+            EditorUtility.DisplayDialog("Saatan", "No se encontró " + MAPA_SELVA + ".", "OK");
+            return;
+        }
+
+        Scene escena = AssetDatabase.LoadAssetAtPath<SceneAsset>(Ruta(ESCENA_SELVA)) != null
+            ? EditorSceneManager.OpenScene(Ruta(ESCENA_SELVA), OpenSceneMode.Single)
+            : EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+
+        ConstructorSelva.ConstruirDesdeTextura(mapa);
+        HerramientasIktan.CrearJugador();
+
+        EditorSceneManager.SaveScene(escena, Ruta(ESCENA_SELVA));
+        AgregarAlBuild();
+        Debug.Log("NivelSelva reconstruido y guardado.");
     }
 
     [MenuItem("Saatan/Escenas/Agregar escenas al Build")]
@@ -177,7 +204,7 @@ public static class ConstructorEscenas
         var boton = Boton(canvasGo.transform, "Boton_Jugar", "Jugar", fuente);
         Colocar((RectTransform)boton.transform, new Vector2(0.5f, 0.35f), new Vector2(420f, 110f));
 
-        // On Click () -> GestorEscenas.CambiarEscena.CargarEscena("Nivel_Selva")
+        // On Click () -> GestorEscenas.CambiarEscena.CargarEscena("NivelSelva")
         UnityEventTools.AddStringPersistentListener(
             boton.onClick,
             new UnityAction<string>(gestor.CargarEscena),
@@ -265,7 +292,7 @@ public static class ConstructorEscenas
         else
         {
             Debug.LogWarning("No se encontró " + MAPA_SELVA + ". La escena " + ESCENA_SELVA +
-                             " se creó vacía; usa Saatan > Construir selva (nivel II) dentro de ella.");
+                             " se creó vacía; usa Saatan > Construir selva (Laberinto) dentro de ella.");
         }
 
         EditorSceneManager.SaveScene(escena, Ruta(ESCENA_SELVA));
