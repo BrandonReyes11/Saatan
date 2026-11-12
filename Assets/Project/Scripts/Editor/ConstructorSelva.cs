@@ -171,6 +171,19 @@ public static class ConstructorSelva
         mapa = new T[w, h];
         for (int i = 0; i < px.Length; i++)
             mapa[i % w, i / w] = px[i].a < 128 ? T.Vacio : paleta.TryGetValue(px[i], out var t) ? t : T.Piso;
+
+        // Abrir la salida hasta el borde del mapa: detrás de ella el mapa trae una fila de borde (colisión y
+        // árboles) y bosque que tapaban el paso a las ruinas. Queda un pasillo con borde arriba y abajo.
+        int y0 = h, y1 = -1, xs = -1;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (mapa[x, y] == T.Salida) { y0 = Mathf.Min(y0, y); y1 = Mathf.Max(y1, y); xs = Mathf.Max(xs, x); }
+        for (int x = xs + 1; xs >= 0 && x < w; x++)
+        {
+            for (int y = y0; y <= y1; y++) mapa[x, y] = T.Piso;
+            if (y0 > 0) mapa[x, y0 - 1] = T.Borde;
+            if (y1 < h - 1) mapa[x, y1 + 1] = T.Borde;
+        }
     }
 
     static Vector3 Pos(int x, int y) => new Vector3(x - w / 2f + 0.5f, 0f, y - h / 2f + 0.5f);
@@ -421,13 +434,13 @@ public static class ConstructorSelva
 
     const float R_ARENA = 20f, PASILLO = 8f;
 
-    // a y b: extremos de la salida del laberinto (borde derecho del mapa).
+    // a y b: extremos de la salida del laberinto; el pasillo a las ruinas empieza en el borde derecho del mapa (x = w/2).
     static void Ruinas(Transform laberinto, Vector3 a, Vector3 b)
     {
         if (GameObject.Find("Ruinas") is GameObject vieja) Object.DestroyImmediate(vieja);
         var raiz = new GameObject("Ruinas").transform;
         var veg = Hijo(raiz, "Vegetacion");
-        float x0 = a.x + 0.5f, zc = (a.z + b.z) / 2f, ancho = b.z - a.z + 1f, rMuro = R_ARENA + 1.5f;
+        float x0 = w / 2f, zc = (a.z + b.z) / 2f, ancho = b.z - a.z + 1f, rMuro = R_ARENA + 1.5f;
         var c = new Vector3(x0 + PASILLO + R_ARENA, 0f, zc);
         System.Func<float, float, Vector3> EnAro = (ang, r) => c + new Vector3(Mathf.Cos(ang * Mathf.Deg2Rad), 0f, Mathf.Sin(ang * Mathf.Deg2Rad)) * r;
         System.Func<string, Vector3, float, Transform> Pieza = (nombre, pos, giro) =>
