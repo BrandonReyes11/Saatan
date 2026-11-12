@@ -1,5 +1,6 @@
 // Saatan Historia - Escena CinematicaIglesia: la iglesia (Art/Iglesia, ch_iso) sobre una pequeña colina,
 // escaleras de piedra para subir, cementerio alrededor, árboles y neblina que oculta el borde del mapa.
+// Iktan y Abbi suben la escalera y llegan a la puerta gigante (hecha con cubos, cierra el hueco de la entrada).
 // Menú: Saatan > Escenas > Crear CinematicaIglesia  (crea Assets/Scenes/CinematicaIglesia.unity y la agrega al Build)
 using System.Collections.Generic;
 using System.IO;
@@ -39,9 +40,10 @@ public static class ConstructorCinematica
         Colina();
         Escalera();
         Poner("ch_iso", new Vector3(0f, ALTO, 0f), 0f, ESCALA_IGLESIA);   // fachada hacia -Z, hacia la escalera
+        Puerta();
         Cementerio();
         Arboles();
-        Ambiente();
+        Ambiente(Personajes());
 
         EditorSceneManager.SaveScene(escena, ESCENA);
         var lista = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
@@ -192,7 +194,73 @@ public static class ConstructorCinematica
 
     // ---------------- Luz, neblina y cámara ----------------
 
-    static void Ambiente()
+    // ---------------- Puerta gigante ----------------
+
+    // Hueco de la entrada en ch_iso (vóxeles): x ±1.85, de y -6.0 a -3.7, la cara del arco en z -5.55.
+    // Puerta de dos hojas de tablones con herrajes, un arco escalonado arriba y un bloque oscuro detrás.
+    static void Puerta()
+    {
+        float E = ESCALA_IGLESIA, ancho = 3.7f * E, abajo = ALTO + 0.2f * E, alto = 2.3f * E, z = -5.5f * E + 0.15f;
+        var g = new GameObject("Puerta_Gigante").transform;
+        g.SetParent(raiz, false);
+        g.localPosition = new Vector3(0f, abajo, z);
+        var madera = Lit("PuertaMadera", new Color(0.32f, 0.18f, 0.09f));
+        var maderaOsc = Lit("PuertaMaderaOscura", new Color(0.22f, 0.12f, 0.06f));
+        var hierro = Lit("PuertaHierro", new Color(0.12f, 0.12f, 0.13f));
+
+        int tablas = 12;
+        for (int i = 0; i < tablas; i++)   // tablones verticales, uno sí y uno no más oscuro
+        {
+            float x = -ancho / 2f + (i + 0.5f) * ancho / tablas;
+            Cubo(g, new Vector3(x, alto / 2f, 0.3f), new Vector3(ancho / tablas - 0.04f, alto, 0.6f), i % 2 == 0 ? madera : maderaOsc);
+        }
+        for (int k = 0; k < 3; k++)   // arco escalonado que tapa la parte de arriba
+        {
+            float w = ancho * (0.8f - k * 0.22f);
+            Cubo(g, new Vector3(0f, alto + 0.35f + k * 0.7f, 0.3f), new Vector3(w, 0.7f, 0.6f), k % 2 == 0 ? maderaOsc : madera);
+        }
+        Cubo(g, new Vector3(0f, alto / 2f + 0.6f, 0.25f), new Vector3(0.25f, alto + 1.2f, 0.65f), hierro);   // unión de las dos hojas
+        foreach (float y in new[] { 0.18f, 0.5f, 0.82f })   // bandas de hierro con clavos
+        {
+            Cubo(g, new Vector3(0f, alto * y, -0.02f), new Vector3(ancho, 0.25f, 0.1f), hierro);
+            for (float x = -ancho / 2f + 0.4f; x < ancho / 2f; x += 0.8f)
+                Cubo(g, new Vector3(x, alto * y, -0.1f), new Vector3(0.14f, 0.14f, 0.1f), hierro);
+        }
+        foreach (float s in new[] { -1f, 1f })   // argollas
+        {
+            Cubo(g, new Vector3(s * 0.7f, alto * 0.45f, -0.12f), new Vector3(0.5f, 0.08f, 0.08f), hierro);
+            Cubo(g, new Vector3(s * 0.7f, alto * 0.45f - 0.25f, -0.12f), new Vector3(0.08f, 0.5f, 0.08f), hierro);
+        }
+        // Bloque oscuro detrás: aunque algo se asome por un hueco, la iglesia no se ve hueca.
+        Cubo(g, new Vector3(0f, alto * 0.75f, 6f), new Vector3(ancho + 1f, alto * 1.5f + 1f, 11f), Lit("Interior", new Color(0.03f, 0.03f, 0.035f)));
+    }
+
+    // ---------------- Iktan y Abbi subiendo ----------------
+
+    static Transform Personajes()
+    {
+        // Línea de la escalera: de y 0 (z -74) a y ALTO (z -34); luego el camino y el pórtico hasta la puerta.
+        System.Func<float, float, Vector3[]> Ruta = (x, z0) => new[]
+        {
+            new Vector3(x, 0.05f, z0), new Vector3(x, 0.2f, -(R_CIMA + SUBIDA) - 0.5f), new Vector3(x, ALTO + 0.2f, -R_CIMA + 0.5f),
+            new Vector3(x, ALTO + 0.2f, -21.5f), new Vector3(x * 0.6f, ALTO + 0.65f, -18.6f),
+        };
+        var iktan = PiezasCinematica.Personaje("IktanVoxel", raiz, Vector3.zero, 0f, 1.4f);
+        var r = iktan.gameObject.AddComponent<RecorridoPersonaje>();
+        r.puntos = Ruta(-0.9f, -82f);
+        r.velocidad = 2f;
+        r.espera = 1.5f;
+
+        var abbi = PiezasCinematica.Personaje("AbbiVoxel", raiz, Vector3.zero, 0f, 0.55f);
+        var ra = abbi.gameObject.AddComponent<RecorridoPersonaje>();
+        ra.puntos = Ruta(1.1f, -83.5f);
+        ra.velocidad = 2.05f;
+        ra.espera = 1.5f;
+        ra.paso = 14f;
+        return iktan;
+    }
+
+    static void Ambiente(Transform iktan)
     {
         RenderSettings.skybox = null;
         RenderSettings.ambientMode = AmbientMode.Flat;
@@ -218,11 +286,15 @@ public static class ConstructorCinematica
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.backgroundColor = NIEBLA;
         cam.farClipPlane = 200f;
+        // La cámara sigue a Iktan por detrás y al llegar levanta la vista hacia la puerta gigante.
         var cine = cam.gameObject.AddComponent<CamaraCinematica>();
-        cine.puntos = new[] { new Vector3(-14f, 3f, -125f), new Vector3(8f, 8f, -90f), new Vector3(0f, 12f, -66f), new Vector3(0f, ALTO + 4f, -46f), new Vector3(0f, ALTO + 3f, -34f) };
-        cine.objetivo = new Vector3(0f, ALTO + 13f, -8f);
-        cam.transform.position = cine.puntos[0];
-        cam.transform.LookAt(cine.objetivo);
+        cine.puntos = new Vector3[0];
+        cine.seguir = iktan;
+        cine.distancia = new Vector3(-3.5f, 3.2f, -7.5f);
+        cine.objetivo = new Vector3(0f, ALTO + 7f, -16f);
+        cine.duracion = 38f;
+        cam.transform.position = new Vector3(-0.9f, 0f, -82f) + cine.distancia;
+        cam.transform.LookAt(new Vector3(-0.9f, 1f, -82f));
     }
 
     // ---------------- Utilidades ----------------
