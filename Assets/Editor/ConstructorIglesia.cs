@@ -24,9 +24,12 @@ public static class ConstructorIglesia
 
     const float ESCALA = 1.5f;              // metros por píxel del mapa (más grande y amplia)
     const float RadioPared = 19.6f * ESCALA;
-    const int AltoPared = 14;               // altura de los muros
-    const float AltoCupula = 10f;           // la cúpula sube 10 m más sobre los muros
+    const int AltoPared = 20;               // altura de los muros
+    const float AltoCupula = 14f;           // la cúpula sube 14 m más (cima a ~34 m)
     const float LadoPilares = 5f;           // pilares del candelabro en (±5, ±5)
+    const float AltoPilares = 18f;          // pilares del candelabro
+    const float NaveX = 2.6f, AltoNave = 16f;   // filas de pilares a ambos lados del pasillo central
+    const int VitralDesde = 12, VitralFilas = 5;  // vitrales altos: de 12 a 17 m
     const int Segmentos = 120;      // 3 grados cada uno
 
     static readonly (Color32 color, Tipo tipo)[] paleta =
@@ -84,6 +87,7 @@ public static class ConstructorIglesia
         { "RayoAzul", new Color(0.06f, 0.10f, 0.30f, 1f) },
         { "RayoVerde", new Color(0.05f, 0.22f, 0.10f, 1f) },
         { "RayoAmarillo", new Color(0.30f, 0.24f, 0.08f, 1f) },
+        { "RayoPolvo", new Color(0.55f, 0.50f, 0.40f, 1f) },
     };
 
     static readonly string[] vidrios = { "Rojo", "Azul", "Amarillo", "Verde" };
@@ -151,14 +155,15 @@ public static class ConstructorIglesia
             foreach (var celda in c) mapa[celda.x, celda.y] = (int)Tipo.Limite;
         }
 
-        // El centro queda libre para los pilares del candelabro.
+        // El centro y el lugar de los pilares de la nave quedan libres.
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
                 Vector3 p = Pos(x, y, w, h);
                 var t = (Tipo)mapa[x, y];
-                if (Mathf.Abs(p.x) < LadoPilares + 1.5f && Mathf.Abs(p.z) < LadoPilares + 1.5f && (t == Tipo.Banca || t == Tipo.Caja || t == Tipo.Vela))
-                    mapa[x, y] = (int)Tipo.Piso;
+                bool libre = Mathf.Abs(p.x) < LadoPilares + 1.5f && Mathf.Abs(p.z) < LadoPilares + 1.5f;
+                foreach (var c in PosNave()) if ((c - p).sqrMagnitude < 2.2f * 2.2f) libre = true;
+                if (libre && (t == Tipo.Banca || t == Tipo.Caja || t == Tipo.Vela)) mapa[x, y] = (int)Tipo.Piso;
             }
 
         // ---- Piso con baldosas, alfombra y colisiones (el límite NO se ve) ----
@@ -219,6 +224,8 @@ public static class ConstructorIglesia
         Banderines(raiz);
         Cupula(raiz);
         PilaresCandelabro(raiz);
+        PilaresNave(raiz);
+        Polvo(raiz);
 
         // ---- Objetos ----
         foreach (var c in Componentes(mapa, w, h, Tipo.Banca))
@@ -288,7 +295,7 @@ public static class ConstructorIglesia
             for (int j = 0; j < AltoPared; j++)
             {
                 if (abre.Contains(i) && j >= 1 && j <= 3) continue;        // hueco del vitral bajo
-                if (abreAlto.Contains(i) && j >= 8 && j <= 11) continue;   // hueco del vitral alto
+                if (abreAlto.Contains(i) && j >= VitralDesde && j < VitralDesde + VitralFilas) continue;   // hueco del vitral alto
                 int tono = (j == 0 || j == AltoPared - 1) ? 2 : ((i + j) % 2);
                 Quad(tonos[tono], PuntoPared(a0, j), PuntoPared(a1, j), PuntoPared(a1, j + 1), PuntoPared(a0, j + 1), normal);
             }
@@ -407,26 +414,29 @@ public static class ConstructorIglesia
         }
     }
 
-    // Vitral alto: hueco de 2 segmentos (≈3 m) entre 8 y 12 m de altura. Entra luz natural del color del vidrio.
+    // Vitral alto de 2 segmentos (≈3 m). La luz natural del color del vidrio se abre y se difumina al bajar.
     static void VentanaAlta(Transform padre, int k, string color)
     {
+        const float y0 = VitralDesde, alto = VitralFilas, ym = y0 + alto / 2f;
         var g = EnPared(padre, "Vitral_Alto", (k + 1f) * (360f / Segmentos), RadioPared);
-        Pieza(g, "MarcoIzq", PrimitiveType.Cube, new Vector3(-1.65f, 10f, 0.1f), new Vector3(0.3f, 4.2f, 0.5f), "PiedraOscura");
-        Pieza(g, "MarcoDer", PrimitiveType.Cube, new Vector3(1.65f, 10f, 0.1f), new Vector3(0.3f, 4.2f, 0.5f), "PiedraOscura");
-        Pieza(g, "Repisa", PrimitiveType.Cube, new Vector3(0f, 7.9f, 0.2f), new Vector3(3.6f, 0.25f, 0.6f), "Piedra");
-        Pieza(g, "Arco", PrimitiveType.Cube, new Vector3(0f, 12.15f, 0.1f), new Vector3(3.6f, 0.35f, 0.5f), "PiedraOscura");
-        for (int fila = 0; fila < 4; fila++)
+        Pieza(g, "MarcoIzq", PrimitiveType.Cube, new Vector3(-1.65f, ym, 0.1f), new Vector3(0.3f, alto + 0.2f, 0.5f), "PiedraOscura");
+        Pieza(g, "MarcoDer", PrimitiveType.Cube, new Vector3(1.65f, ym, 0.1f), new Vector3(0.3f, alto + 0.2f, 0.5f), "PiedraOscura");
+        Pieza(g, "Repisa", PrimitiveType.Cube, new Vector3(0f, y0 - 0.1f, 0.2f), new Vector3(3.6f, 0.25f, 0.6f), "Piedra");
+        Pieza(g, "Arco", PrimitiveType.Cube, new Vector3(0f, y0 + alto + 0.15f, 0.1f), new Vector3(3.6f, 0.35f, 0.5f), "PiedraOscura");
+        for (int fila = 0; fila < VitralFilas; fila++)
             for (int col = 0; col < 3; col++)
             {
                 string c = (fila + col) % 3 == 0 ? "Amarillo" : (fila + col) % 3 == 1 ? color : vidrios[(fila * 3 + col + k) % 4];
                 if (rnd.NextDouble() < 0.12) continue;   // vidrios rotos
-                Pieza(g, "Cristal", PrimitiveType.Cube, new Vector3(-1.05f + col * 1.05f, 8.5f + fila * 1f, -0.05f), new Vector3(1f, 0.95f, 0.08f), "Vitral" + c);
+                Pieza(g, "Cristal", PrimitiveType.Cube, new Vector3(-1.05f + col * 1.05f, y0 + 0.5f + fila, -0.05f), new Vector3(1f, 0.95f, 0.08f), "Vitral" + c);
             }
 
-        // Rayo de luz que baja hacia el centro: foco + haz visible (aditivo).
-        Vector3 dir = new Vector3(0f, -0.75f, 1f).normalized;
-        Foco(g, new Vector3(0f, 10f, 0.6f), dir, ColorLuz(color), 34f, 45f, 7f);
-        Rayo(g, new Vector3(0f, 10f, 0.6f), dir, 18f, 2.6f, "Rayo" + color);
+        Vector3 dir = new Vector3(0f, -0.8f, 1f).normalized, desde = new Vector3(0f, ym, 0.6f);
+        float largo = ym / -dir.y;   // hasta el piso
+        Foco(g, desde, dir, ColorLuz(color), largo + 15f, 100f, 9f);                        // cono amplio y suave
+        Luz(g, desde + dir * largo + Vector3.up * 1.5f, ColorLuz(color), 11f, 1.6f);          // luz que rebota en el piso
+        Rayo(g, desde, dir, largo, 2.8f, "Rayo" + color);
+        Rayo(g, desde, dir, largo * 0.9f, 4.5f, "Rayo" + color);                              // halo exterior, más tenue
     }
 
     // Cúpula de piedra sobre los muros, con un rosetón de vidrio en lo más alto.
@@ -477,14 +487,15 @@ public static class ConstructorIglesia
             p.localRotation = Quaternion.Euler(0f, i * 45f, 0f);
         }
         Pieza(g, "Centro", PrimitiveType.Cylinder, Vector3.down * 0.12f, new Vector3(1.2f, 0.06f, 1.2f), "VitralAmarillo");
-        Foco(g, Vector3.down * 0.5f, Vector3.down, new Color(1f, 0.92f, 0.75f), yTop + 4f, 35f, 9f);
-        Rayo(g, Vector3.down * 0.3f, Vector3.down, yTop, rOculo * 1.6f, "RayoAmarillo");
+        Foco(g, Vector3.down * 0.5f, Vector3.down, new Color(1f, 0.92f, 0.75f), yTop + 10f, 90f, 12f);
+        Rayo(g, Vector3.down * 0.3f, Vector3.down, yTop, rOculo * 1.8f, "RayoAmarillo");
+        Rayo(g, Vector3.down * 0.3f, Vector3.down, yTop * 0.9f, rOculo * 3f, "RayoAmarillo");
     }
 
     // Cuatro pilares de piedra con vigas que sostienen un candelabro de hierro colgante.
     static void PilaresCandelabro(Transform raiz)
     {
-        const float H = 11f, L = LadoPilares;
+        const float H = AltoPilares, L = LadoPilares;
         var g = Grupo(raiz, "Pilares_Candelabro", Vector3.zero);
         foreach (float sx in new[] { -L, L })
             foreach (float sz in new[] { -L, L })
@@ -508,7 +519,7 @@ public static class ConstructorIglesia
             Pieza(g, "Diagonal", PrimitiveType.Cube, new Vector3(0f, H + 1.1f, 0f), new Vector3(0.5f, 0.45f, 2.83f * L), "MaderaOscura").localRotation = Quaternion.Euler(0f, ang, 0f);
 
         // Candelabro colgando de una cadena.
-        const float Y = 7f, R = 2.2f;
+        const float Y = 10f, R = 2.6f;
         Pieza(g, "Cadena", PrimitiveType.Cube, new Vector3(0f, (H + 1f + Y) / 2f, 0f), new Vector3(0.1f, H + 1f - Y, 0.1f), "Hierro");
         var c = Grupo(g, "Candelabro_Colgante", new Vector3(0f, Y, 0f));
         Pieza(c, "Centro", PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.6f, 0.3f, 0.6f), "Hierro");
@@ -606,12 +617,108 @@ public static class ConstructorIglesia
         l.shadows = LightShadows.None;
     }
 
-    // Haz de luz visible: caja alargada con material aditivo transparente.
+    // Haz de luz visible: cono que se abre (x3) y se desvanece hacia el final, con material aditivo.
     static void Rayo(Transform padre, Vector3 desde, Vector3 dir, float largo, float grosor, string material)
     {
-        var r = Pieza(padre, "Haz_Luz", PrimitiveType.Cube, desde + dir * (largo / 2f), new Vector3(grosor, grosor, largo), material);
-        r.localRotation = Mirar(dir);
-        r.GetComponent<Renderer>().shadowCastingMode = ShadowCastingMode.Off;
+        var go = new GameObject("Haz_Luz");
+        go.transform.SetParent(padre, false);
+        go.transform.localPosition = desde;
+        go.transform.localRotation = Mirar(dir);
+        go.transform.localScale = new Vector3(grosor, grosor, largo);
+        go.AddComponent<MeshFilter>().sharedMesh = MallaHaz();
+        var r = go.AddComponent<MeshRenderer>();
+        r.sharedMaterial = M(material);
+        r.shadowCastingMode = ShadowCastingMode.Off;
+    }
+
+    static Mesh haz;
+    static Mesh MallaHaz()
+    {
+        if (haz != null) return haz;
+        const int lados = 24;
+        float[] z = { 0f, 0.15f, 1f }, radio = { 0.5f, 0.7f, 1.5f }, brillo = { 0.5f, 1f, 0f };
+        var v = new List<Vector3>(); var col = new List<Color>(); var t = new List<int>();
+        for (int a = 0; a < 3; a++)
+            for (int i = 0; i <= lados; i++)
+            {
+                float ang = i * Mathf.PI * 2f / lados;
+                v.Add(new Vector3(Mathf.Cos(ang) * radio[a], Mathf.Sin(ang) * radio[a], z[a]));
+                col.Add(new Color(brillo[a], brillo[a], brillo[a], brillo[a]));
+            }
+        for (int a = 0; a < 2; a++)
+            for (int i = 0; i < lados; i++)
+            {
+                int p = a * (lados + 1) + i, q = p + lados + 1;
+                t.AddRange(new[] { p, q, p + 1, p + 1, q, q + 1 });
+            }
+        haz = new Mesh { name = "Iglesia_Haz" };
+        haz.SetVertices(v);
+        haz.SetColors(col);
+        haz.SetTriangles(t, 0);
+        haz.RecalculateNormals();
+        haz.RecalculateBounds();
+        AssetDatabase.DeleteAsset("Assets/Niveles/Iglesia/Malla_Haz.asset");
+        AssetDatabase.CreateAsset(haz, "Assets/Niveles/Iglesia/Malla_Haz.asset");
+        return haz;
+    }
+
+    // Posiciones de los pilares de la nave: dos filas junto al pasillo central (sin tapar el candelabro).
+    static List<Vector3> PosNave()
+    {
+        var l = new List<Vector3>();
+        for (float z = -24f; z <= 22f; z += 6.5f)
+            if (Mathf.Abs(z) > 7.5f)
+                foreach (float x in new[] { -NaveX, NaveX }) l.Add(new Vector3(x, 0f, z));
+        return l;
+    }
+
+    static void PilaresNave(Transform raiz)
+    {
+        var l = PosNave();
+        for (int i = 0; i < l.Count; i++)
+        {
+            var p = Grupo(raiz, "Pilar_Nave", l[i]);
+            Pieza(p, "Base", PrimitiveType.Cube, new Vector3(0f, 0.3f, 0f), new Vector3(1.5f, 0.6f, 1.5f), "PiedraOscura");
+            Pieza(p, "Fuste", PrimitiveType.Cylinder, new Vector3(0f, AltoNave / 2f, 0f), new Vector3(1f, AltoNave / 2f, 1f), "Piedra");
+            Pieza(p, "Capitel", PrimitiveType.Cube, new Vector3(0f, AltoNave, 0f), new Vector3(1.4f, 0.5f, 1.4f), "PiedraOscura");
+            var cc = p.gameObject.AddComponent<CapsuleCollider>();
+            cc.center = new Vector3(0f, AltoNave / 2f, 0f);
+            cc.radius = 0.6f;
+            cc.height = AltoNave;
+
+            // Arco (dintel) hasta el siguiente pilar de la misma fila.
+            if (i + 2 < l.Count && l[i + 2].z - l[i].z < 7f)
+                Pieza(raiz, "Dintel_Nave", PrimitiveType.Cube, (l[i] + l[i + 2]) / 2f + Vector3.up * (AltoNave + 0.6f), new Vector3(0.9f, 0.8f, l[i + 2].z - l[i].z + 1.4f), "PiedraOscura");
+        }
+    }
+
+    // Polvo flotando en el aire: se nota sobre todo dentro de los haces de luz.
+    static void Polvo(Transform raiz)
+    {
+        var go = new GameObject("Polvo");
+        go.transform.SetParent(raiz, false);
+        go.transform.localPosition = Vector3.up * 8f;
+        var ps = go.AddComponent<ParticleSystem>();
+        var main = ps.main;
+        main.loop = true;
+        main.startLifetime = 18f;
+        main.startSpeed = 0.08f;
+        main.startSize = new ParticleSystem.MinMaxCurve(0.04f, 0.1f);
+        main.startColor = new Color(1f, 0.9f, 0.7f, 0.6f);
+        main.maxParticles = 1500;
+        main.prewarm = true;
+        var em = ps.emission;
+        em.rateOverTime = 70f;
+        var forma = ps.shape;
+        forma.shapeType = ParticleSystemShapeType.Box;
+        forma.scale = new Vector3(RadioPared * 1.4f, 16f, RadioPared * 1.4f);
+        var ruido = ps.noise;
+        ruido.enabled = true;
+        ruido.strength = 0.15f;
+        ruido.frequency = 0.2f;
+        var r = go.GetComponent<ParticleSystemRenderer>();
+        r.sharedMaterial = M("RayoPolvo");
+        r.shadowCastingMode = ShadowCastingMode.Off;
     }
 
     // ---------------- Objetos ----------------
@@ -937,7 +1044,7 @@ public static class ConstructorIglesia
         if (nombre.StartsWith("Rayo"))
         {
             // Unlit transparente aditivo (sin ZWrite, visible por ambos lados).
-            m.shader = Shader.Find("Universal Render Pipeline/Unlit");
+            m.shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");   // usa el color de vértice (desvanecido)
             m.SetFloat("_Surface", 1f);
             m.SetFloat("_Blend", 2f);
             m.SetFloat("_Cull", 0f);
@@ -970,7 +1077,7 @@ public static class ConstructorIglesia
     {
         RenderSettings.skybox = null;
         RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.16f, 0.13f, 0.20f);
+        RenderSettings.ambientLight = new Color(0.20f, 0.17f, 0.24f);
         RenderSettings.fog = true;   // polvo en el aire
         RenderSettings.fogMode = FogMode.Linear;
         RenderSettings.fogColor = new Color(0.05f, 0.04f, 0.06f);
