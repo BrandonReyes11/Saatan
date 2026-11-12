@@ -3,7 +3,7 @@
 //   negro = borde (árboles + arbustos, con colisión) | verde oscuro = bosque cerrado | verde = hierba alta
 //   blanco = pasillo (decoración pequeña) | azul = inicio | rosa = salida
 // Optimización: modelos LOD2, suelo en un solo quad con textura, colisiones con cajas,
-// y todo agrupado en zonas de ZONA x ZONA m que CargaSelva activa solo cerca del jugador.
+// y todo agrupado en zonas de ZONA x ZONA m que CargaSelva activa solo cerca del jugador (con neblina).
 // Menú: Saatan > Construir selva (Laberinto)   |   Saatan > Escenas > Reconstruir NivelSelva
 
 using System.Collections.Generic;
@@ -117,7 +117,7 @@ public static class ConstructorSelva
             bool junto = Distancia(p, T.Borde, 1) <= 1;
             double r = rnd.NextDouble();
             if (junto && r < 0.04) Poner(piedras, p, "Piedra");
-            else if (junto ? r < 0.16 : r < 0.03) Poner(plantas, p, "Planta");
+            else if (junto ? r < 0.16 : r < 0.06) Poner(plantas, p, "Planta");
         }
 
         // Inicio y salida.
@@ -205,18 +205,20 @@ public static class ConstructorSelva
 
     // ---------------- Suelo y colisiones ----------------
 
-    // Un solo quad con una textura de w x h (1 píxel por celda): 1 draw call para todo el suelo.
+    // Un solo quad con textura para todo el suelo (1 draw call).
     static void Suelo(Transform raiz)
     {
-        Color tierraA = new Color(0.20f, 0.15f, 0.09f), tierraB = new Color(0.17f, 0.13f, 0.08f);
-        Color musgo = new Color(0.16f, 0.30f, 0.11f), hojarasca = new Color(0.12f, 0.10f, 0.06f);
-
-        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Tex_Suelo" };
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-                tex.SetPixel(x, y, mapa[x, y] == T.Pasto ? musgo
-                    : mapa[x, y] == T.Piso || mapa[x, y] == T.Inicio || mapa[x, y] == T.Salida ? ((x * 7 + y * 13) % 5 < 2 ? tierraB : tierraA)
-                    : hojarasca);
+        // Césped en bloques de 25 cm (4 píxeles por metro) con tonos variados, al estilo voxel.
+        const int R = 4;
+        Color cesped = new Color(0.30f, 0.55f, 0.18f), hierbaAlta = new Color(0.20f, 0.42f, 0.12f), sombra = new Color(0.15f, 0.30f, 0.10f);
+        var tex = new Texture2D(w * R, h * R, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Tex_Suelo" };
+        for (int y = 0; y < h * R; y++)
+            for (int x = 0; x < w * R; x++)
+            {
+                T t = mapa[x / R, y / R];
+                Color c = t == T.Pasto ? hierbaAlta : t == T.Borde || t == T.Bosque || t == T.Vacio ? sombra : cesped;
+                tex.SetPixel(x, y, c * (0.85f + 0.3f * (float)rnd.NextDouble()));
+            }
         tex.Apply();
         Guardar(tex, CARPETA + "/Tex_Suelo.asset");
 
@@ -335,34 +337,23 @@ public static class ConstructorSelva
         return m;
     }
 
+    // La neblina, el color de fondo y el alcance de la cámara los aplica CargaSelva al iniciar.
     static void ConfigurarEscena()
     {
-        Color niebla = new Color(0.10f, 0.20f, 0.13f);
         RenderSettings.skybox = null;
         RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.30f, 0.36f, 0.30f);
-        // Neblina ligera: la cámara está a ~22 m de Iktan; lo que está a más de ~55 m se pierde en ella.
-        RenderSettings.fog = true;
-        RenderSettings.fogMode = FogMode.Linear;
-        RenderSettings.fogColor = niebla;
-        RenderSettings.fogStartDistance = 28f;
-        RenderSettings.fogEndDistance = 58f;
-
+        RenderSettings.ambientLight = new Color(0.40f, 0.45f, 0.40f);
         foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
             if (l.type == LightType.Directional)
             {
-                l.intensity = 0.9f;
-                l.color = new Color(1f, 0.95f, 0.8f);
+                l.intensity = 1f;
+                l.color = new Color(1f, 0.96f, 0.85f);
                 l.shadows = LightShadows.None;
-                l.transform.rotation = Quaternion.Euler(55f, -30f, 0f);
+                l.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             }
 
         var cam = Camera.main;
         if (cam == null) return;
-        cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = niebla;
-        cam.farClipPlane = 60f;
-        cam.transform.rotation = Quaternion.Euler(65f, 0f, 0f);
         var carga = cam.GetComponent<CargaSelva>();
         if (carga == null) carga = cam.gameObject.AddComponent<CargaSelva>();
         carga.zonas = zonas;

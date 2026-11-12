@@ -64,7 +64,6 @@ public static class HerramientasIktan
             var seguir = cam.GetComponent<SeguirCamara>();
             if (seguir == null) seguir = cam.gameObject.AddComponent<SeguirCamara>();
             seguir.objetivo = raiz.transform;
-            seguir.offset = new Vector3(0f, 20f, -9f);
             seguir.AjustarYa();
         }
 

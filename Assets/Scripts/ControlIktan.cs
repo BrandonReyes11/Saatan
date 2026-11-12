@@ -1,6 +1,6 @@
 // Saatan Historia - Movimiento de Iktan (sistema de Input nuevo de Unity 6).
 // Colocar en: Assets/Scripts/ControlIktan.cs
-// Controles: WASD o flechas, o palanca izquierda del control.
+// Controles: WASD o flechas, o palanca izquierda del control (relativo a la cámara).
 // Cuclillas (sigilo): Ctrl izquierdo, C, o botón B / círculo del control.
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -54,7 +54,14 @@ public class ControlIktan : MonoBehaviour
         EnCuclillas = agachado;
         EnMovimiento = m.sqrMagnitude > 0.01f;
 
+        // Movimiento relativo a la cámara: W siempre avanza hacia donde mira la cámara.
         Vector3 dir = new Vector3(m.x, 0f, m.y);
+        var cam = Camera.main;
+        if (cam != null)
+        {
+            Vector3 frente = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up).normalized;
+            dir = frente * m.y + Vector3.Cross(Vector3.up, frente) * m.x;
+        }
         float v = agachado ? velocidadCuclillas : velocidad;
 
         if (cc.isGrounded && velY < 0f) velY = -2f;
