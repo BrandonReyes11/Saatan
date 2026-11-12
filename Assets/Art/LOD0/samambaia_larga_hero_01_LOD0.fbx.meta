@@ -3,7 +3,12 @@ guid: 2d8069f037fcf424fa9e56414944ceae
 ModelImporter:
   serializedVersion: 24600
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Floresta_Voxel
+    second: {fileID: 2100000, guid: eff8b775de97d47bda6d6016937813da, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
