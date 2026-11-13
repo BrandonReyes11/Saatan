@@ -121,7 +121,7 @@ public static class CutsceneParts
         var t = go.transform;
         string[] props = { "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z", "localEulerAnglesRaw.x", "localEulerAnglesRaw.y", "localEulerAnglesRaw.z" };
         float[] actuales = { t.localPosition.x, t.localPosition.y, t.localPosition.z, t.localEulerAngles.x, t.localEulerAngles.y, t.localEulerAngles.z };
-        for (int k = 0; k < 6; k++)
+        for (int k = 0; k < 6 && !(t is RectTransform); k++)   // la UI se acomoda sola: no fijar su posición
             if (AnimationUtility.GetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Transform), props[k])) == null)
                 AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Transform), props[k]), AnimationCurve.Constant(0f, largo, actuales[k]));
 

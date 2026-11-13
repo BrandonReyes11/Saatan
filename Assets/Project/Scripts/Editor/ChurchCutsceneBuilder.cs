@@ -15,7 +15,7 @@ public static class ChurchCutsceneBuilder
     const string ESCENA = "Assets/Project/Scenes/CinematicaIglesia.unity";
     const string ARTE = "Assets/Project/Prefabs/Environment/Iglesia";
     const string CARPETA = "Assets/Project/Niveles/Cinematica";
-    const float ALTO = 14f;           // altura de la colina
+    public const float ALTO = 14f;           // altura de la colina
     const float R_CIMA = 34f;         // radio de la cima plana
     const float SUBIDA = 40f;         // largo de la escalera (y de la ladera)
     const float ANCHO = 7f;           // ancho de la escalera
@@ -34,16 +34,7 @@ public static class ChurchCutsceneBuilder
         if (!AssetDatabase.IsValidFolder(CARPETA)) AssetDatabase.CreateFolder("Assets/Project/Niveles", "Cinematica");
 
         var escena = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-        rnd = new System.Random(31);
-        materiales.Clear();
-        raiz = new GameObject("Cinematica_Iglesia").transform;
-
-        Colina();
-        Escalera();
-        Poner("ch_iso", new Vector3(0f, ALTO, 0f), 0f, ESCALA_IGLESIA);   // fachada hacia -Z, hacia la escalera
-        Puerta();
-        Cementerio();
-        Arboles();
+        ConstruirDecorado().name = "Cinematica_Iglesia";
         Ambiente();
         Timeline();
 
@@ -54,6 +45,29 @@ public static class ChurchCutsceneBuilder
         AssetDatabase.SaveAssets();
         Debug.Log("CinematicaIglesia creada: " + ESCENA);
     }
+
+    // Colina, escalera, iglesia con su puerta, cementerio y árboles (lo usan CinematicaIglesia y el tráiler).
+    public static Transform ConstruirDecorado()
+    {
+        if (!AssetDatabase.IsValidFolder(CARPETA)) AssetDatabase.CreateFolder("Assets/Project/Niveles", "Cinematica");
+        rnd = new System.Random(31);
+        materiales.Clear();
+        raiz = new GameObject("Decorado_Iglesia").transform;
+        Colina();
+        Escalera();
+        Poner("ch_iso", new Vector3(0f, ALTO, 0f), 0f, ESCALA_IGLESIA);   // fachada hacia -Z, hacia la escalera
+        Puerta();
+        Cementerio();
+        Arboles();
+        return raiz;
+    }
+
+    // Ruta de Iktan y Abbi: suelo (z0) > pie de la escalera > cima > camino > pórtico frente a la puerta.
+    public static Vector3[] Ruta(float x, float z0) => new[]
+    {
+        new Vector3(x, 0.05f, z0), new Vector3(x, 0.2f, -(R_CIMA + SUBIDA) - 0.5f), new Vector3(x, ALTO + 0.2f, -R_CIMA + 0.5f),
+        new Vector3(x, ALTO + 0.2f, -21.5f), new Vector3(x * 0.6f, ALTO + 0.65f, -18.6f),
+    };
 
     // ---------------- Colina ----------------
 
@@ -242,12 +256,6 @@ public static class ChurchCutsceneBuilder
     static void Timeline()
     {
         var d = CutsceneParts.Director(raiz, "Iglesia", "NivelIglesia", out var tl);
-        // Línea de la escalera: de y 0 (z -74) a y ALTO (z -34); luego el camino y el pórtico hasta la puerta.
-        System.Func<float, float, Vector3[]> Ruta = (x, z0) => new[]
-        {
-            new Vector3(x, 0.05f, z0), new Vector3(x, 0.2f, -(R_CIMA + SUBIDA) - 0.5f), new Vector3(x, ALTO + 0.2f, -R_CIMA + 0.5f),
-            new Vector3(x, ALTO + 0.2f, -21.5f), new Vector3(x * 0.6f, ALTO + 0.65f, -18.6f),
-        };
         const float vel = 2f, espera = 1.5f;
         Vector3[] rutaIktan = Ruta(-0.9f, -82f), rutaAbbi = Ruta(1.1f, -83.5f);
         float dur = espera + CutsceneParts.LargoRuta(rutaAbbi) / vel + 3.5f;   // + unos segundos frente a la puerta

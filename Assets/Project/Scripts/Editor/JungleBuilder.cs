@@ -436,6 +436,9 @@ public static class JungleBuilder
     const float R_ARENA = 20f, PASILLO = 8f;
 
     // a y b: extremos de la salida del laberinto; el pasillo a las ruinas empieza en el borde derecho del mapa (x = w/2).
+    // Centro de la plaza de las ruinas y punto donde empieza su pasillo (los usa el tráiler).
+    public static Vector3 CentroRuinas, InicioPasillo;
+
     static Vector3 Ruinas(Transform laberinto, Vector3 a, Vector3 b)
     {
         if (GameObject.Find("Ruinas") is GameObject vieja) Object.DestroyImmediate(vieja);
@@ -579,6 +582,8 @@ public static class JungleBuilder
         entrada.laberinto = laberinto.gameObject;
         entrada.cierre = cierre.gameObject;
         entrada.pelea = pelea.gameObject;
+        CentroRuinas = c;
+        InicioPasillo = new Vector3(x0, 0f, zc);
         return c;
     }
 

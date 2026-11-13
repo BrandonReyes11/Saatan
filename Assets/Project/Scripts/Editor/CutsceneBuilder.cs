@@ -113,6 +113,31 @@ public static class CutsceneBuilder
         var raiz = NuevaEscena("Cinematica_Altar");
         if (raiz == null) return;
 
+        AltarDecorado(raiz);
+
+        // Totalmente oscuro: sin luz direccional, sin ambiente, fondo negro.
+        foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            if (l.type == LightType.Directional) Object.DestroyImmediate(l.gameObject);
+        RenderSettings.skybox = null;
+        RenderSettings.ambientMode = AmbientMode.Flat;
+        RenderSettings.ambientLight = new Color(0.03f, 0.025f, 0.03f);   // casi negro: solo se distinguen las siluetas
+        RenderSettings.fog = false;
+
+        var cam = Camera.main;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = Color.black;
+        // Timeline (26 s): la cámara se acerca muy despacio desde el fondo del cuarto hasta la foto; luego al menú.
+        var d = Director(raiz, "Altar", "MenuPrincipal", out var tl);
+        CamaraPorPuntos(tl, d, cam, new[] { new Vector3(0f, 1.6f, -12f), new Vector3(0f, 1.8f, -7f), new Vector3(0f, 2.1f, -3.5f), new Vector3(0f, 2.45f, -1.15f) },
+            FotoAltar, 26f);
+        GuardarEscena("Assets/Project/Scenes/AltarCInematica.unity");
+    }
+
+    public static readonly Vector3 FotoAltar = new Vector3(0f, 2.15f, 0.3f);   // centro de la foto de Iktan (cima del altar)
+
+    // Cuarto oscuro con el altar de muertos de tres pisos (lo usan AltarCInematica y el tráiler).
+    public static void AltarDecorado(Transform raiz)
+    {
         // Cuarto oscuro: solo lo iluminan las velas.
         var muro = Mat("MuroOscuro", new Color(0.09f, 0.07f, 0.07f));
         Cubo(raiz, new Vector3(0f, -0.1f, -4f), new Vector3(10f, 0.2f, 20f), Mat("PisoOscuro", new Color(0.12f, 0.09f, 0.07f)));
@@ -175,22 +200,6 @@ public static class CutsceneBuilder
         for (int i = 0; i < 4; i++)
             foreach (float s in new[] { -1f, 1f }) Vela(altar, new Vector3(s * 0.9f, 0f, -1.2f - i * 1.8f), 0.3f, i < 2);
 
-        // Totalmente oscuro: sin luz direccional, sin ambiente, fondo negro.
-        foreach (var l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
-            if (l.type == LightType.Directional) Object.DestroyImmediate(l.gameObject);
-        RenderSettings.skybox = null;
-        RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.03f, 0.025f, 0.03f);   // casi negro: solo se distinguen las siluetas
-        RenderSettings.fog = false;
-
-        var cam = Camera.main;
-        cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = Color.black;
-        // Timeline (26 s): la cámara se acerca muy despacio desde el fondo del cuarto hasta la foto; luego al menú.
-        var d = Director(raiz, "Altar", "MenuPrincipal", out var tl);
-        CamaraPorPuntos(tl, d, cam, new[] { new Vector3(0f, 1.6f, -12f), new Vector3(0f, 1.8f, -7f), new Vector3(0f, 2.1f, -3.5f), new Vector3(0f, 2.45f, -1.15f) },
-            new Vector3(0f, Tope(2) + 0.33f, 0.3f), 26f);
-        GuardarEscena("Assets/Project/Scenes/AltarCInematica.unity");
     }
 
     // ---------------- Utilidades ----------------

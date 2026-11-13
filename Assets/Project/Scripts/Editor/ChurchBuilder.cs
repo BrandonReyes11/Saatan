@@ -102,6 +102,18 @@ public static class ChurchBuilder
     }
 
     [MenuItem("Saatan/Construir iglesia detallada")]
+    // Para el tráiler: construye la iglesia sin crear a Iktan ni tocar la cámara. Devuelve la raíz.
+    public static Transform ConstruirParaTrailer()
+    {
+        paraTrailer = true;
+        Selection.activeObject = null;
+        try { Construir(); }
+        finally { paraTrailer = false; }
+        var go = GameObject.Find("Iglesia_Detallada");
+        return go != null ? go.transform : null;
+    }
+    static bool paraTrailer;
+
     static void Construir()
     {
         var tex = Selection.activeObject as Texture2D;
@@ -263,8 +275,11 @@ public static class ChurchBuilder
         // pasa a la cinemática del altar.
         Grupo(raiz, "Fin_Nivel", Vector3.zero).gameObject.AddComponent<SceneChanger>().escena = "AltarCInematica";
         IktanTools.DarVidaAlFuego(raiz.gameObject);
-        ConfigurarEscena();
-        IktanTools.CrearJugador();   // Iktan en el nuevo punto de inicio, con la cámara en tercera persona
+        if (!paraTrailer)
+        {
+            ConfigurarEscena();
+            IktanTools.CrearJugador();   // Iktan en el nuevo punto de inicio, con la cámara en tercera persona
+        }
 
         AssetDatabase.SaveAssets();
         EditorSceneManager.MarkAllScenesDirty();
