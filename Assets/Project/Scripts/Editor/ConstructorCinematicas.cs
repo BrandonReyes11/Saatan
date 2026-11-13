@@ -19,38 +19,12 @@ public static class ConstructorCinematicas
         if (raiz == null) return;
         Color niebla = new Color(0.55f, 0.66f, 0.58f);   // mismo color de neblina que el nivel de la selva
 
-        // Claro de la selva con los mismos modelos del nivel: árboles, arbustos, hierba alta, plantas, piedras y ruinas.
+        // Escenario: las mismas ruinas del nivel de la selva (mismo constructor y misma semilla: muros, pilares,
+        // losas, altar, musgo y la vegetación de alrededor), con el centro de la plaza en el origen.
+        if (ConstructorSelva.RuinasParaCinematica(raiz) == null)
+            Debug.LogWarning("No se pudieron construir las ruinas de la selva para la cinemática.");
         var cesped = AssetDatabase.LoadAssetAtPath<Material>("Assets/Project/Niveles/Selva/Mat_Cesped.mat");
-        Cubo(raiz, new Vector3(0f, -0.25f, 0f), new Vector3(120f, 0.5f, 120f), cesped != null ? cesped : Mat("Cesped", new Color(0.30f, 0.52f, 0.18f)));
-        var veg = AssetDatabase.LoadAssetAtPath<Material>("Assets/Project/Niveles/Selva/Mat_Vegetacion_Voxel.mat");
-        var grupos = new (string[] modelos, float min, float max, int n, float rMin, float rMax, bool bajo)[]
-        {
-            (new[] { "acacia_australiana_01", "arvore_folhas_largas_01", "arvore_torta_floresta_01", "arvore_casca_rugosa_01", "eucalipto_alto_02" }, 7f, 11f, 34, 9f, 26f, false),
-            (new[] { "arvore_torta_floresta_01", "samambaia_arborea_01" }, 3.5f, 5f, 10, 7f, 12f, false),
-            (new[] { "arbusto_arredondado_01", "arbusto_irregular_01", "arbusto_folhas_largas_01", "moita_seca_01", "samambaia_larga_hero_01" }, 1.2f, 2.4f, 34, 5f, 16f, false),
-            (new[] { "capim_alto_estilizado_01", "samambaia_media_01" }, 0.9f, 1.6f, 50, 3.5f, 14f, false),
-            (new[] { "grama_baixa_x_01", "grama_media_x_01", "folhagem_rasteira_01", "samambaia_baixa_densa_01", "planta_roteada_01" }, 0.15f, 0.8f, 60, 2f, 14f, true),
-            (new[] { "pedra_01", "pedra_02", "pedra_03", "pedra_04", "pedra_05" }, 0.4f, 1.2f, 14, 4f, 14f, false),
-        };
-        foreach (var gr in grupos)
-            for (int i = 0; i < gr.n; i++)
-            {
-                float a = (float)rnd.NextDouble() * Mathf.PI * 2f, r = Mathf.Lerp(gr.rMin, gr.rMax, (float)rnd.NextDouble());
-                var p = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
-                if (!gr.bajo && p.z < 0.5f && p.z > -10f && Mathf.Abs(p.x) < 5.5f) continue;   // libre donde están Iktan, Abbi y la cámara
-                Modelo("Assets/Project/Prefabs/Environment/Selva/" + gr.modelos[rnd.Next(gr.modelos.Length)] + "_LOD2.fbx", raiz, p, rnd.Next(360),
-                    Mathf.Lerp(gr.min, gr.max, (float)rnd.NextDouble()), veg);
-            }
-        foreach (var (pieza, pos, giro) in new[] { ("PillarRoundCut", new Vector3(-6f, 0f, 6f), 0f), ("WallBrokenMD", new Vector3(5f, 0f, 8f), 30f),
-            ("PillarRound", new Vector3(7f, 0f, 2f), 0f), ("BlockMossXS", new Vector3(0f, -0.38f, 3f), 0f), ("GroundMossMD", new Vector3(-4f, 0f, 2f), 0f),
-            ("WallBrokenXS", new Vector3(-8f, 0f, -1f), 70f), ("PillarSquareCut", new Vector3(9f, 0f, -3f), 0f), ("MossXS", new Vector3(6.5f, 0f, 2.5f), 0f) })
-        {
-            var pf = ConstructorSelva.Ruina(pieza);
-            if (pf == null) continue;
-            var t = ((GameObject)PrefabUtility.InstantiatePrefab(pf, raiz)).transform;
-            t.localPosition = pos;
-            t.localRotation = Quaternion.Euler(0f, giro, 0f);
-        }
+        Cubo(raiz, new Vector3(0f, -0.4f, 0f), new Vector3(160f, 0.5f, 160f), cesped != null ? cesped : Mat("Cesped", new Color(0.30f, 0.52f, 0.18f)));
 
         // Personajes: el Nahual frente a Iktan y Abbi.
         var nahual = Personaje("NahualVoxel", raiz, new Vector3(0f, 0f, 3f), 180f, 2.4f);

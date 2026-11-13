@@ -13,7 +13,7 @@ using UnityEngine.Rendering;
 public static class ConstructorCinematica
 {
     const string ESCENA = "Assets/Project/Scenes/CinematicaIglesia.unity";
-    const string ARTE = "Assets/Project/Prefabs/Environment/Iglesia/XeehSets/Cemetery and Church/Prefabs";
+    const string ARTE = "Assets/Project/Prefabs/Environment/Iglesia";
     const string CARPETA = "Assets/Project/Niveles/Cinematica";
     const float ALTO = 14f;           // altura de la colina
     const float R_CIMA = 34f;         // radio de la cima plana

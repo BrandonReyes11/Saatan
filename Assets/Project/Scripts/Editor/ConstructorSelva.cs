@@ -141,6 +141,7 @@ public static class ConstructorSelva
             Vector3 a = sal[0], b = sal[0];
             foreach (var p in sal) { a = Vector3.Min(a, p); b = Vector3.Max(b, p); }
             Progreso("Ruinas", 0.9f);
+            rnd = new System.Random(SEMILLA + 1);   // misma semilla que RuinasParaCinematica: ruinas idénticas
             Ruinas(raiz, a, b);
         }
 
@@ -435,7 +436,7 @@ public static class ConstructorSelva
     const float R_ARENA = 20f, PASILLO = 8f;
 
     // a y b: extremos de la salida del laberinto; el pasillo a las ruinas empieza en el borde derecho del mapa (x = w/2).
-    static void Ruinas(Transform laberinto, Vector3 a, Vector3 b)
+    static Vector3 Ruinas(Transform laberinto, Vector3 a, Vector3 b)
     {
         if (GameObject.Find("Ruinas") is GameObject vieja) Object.DestroyImmediate(vieja);
         var raiz = new GameObject("Ruinas").transform;
@@ -455,13 +456,19 @@ public static class ConstructorSelva
         float hueco = Mathf.Asin((ancho / 2f + 0.5f) / rMuro) * Mathf.Rad2Deg;   // abertura de la entrada (lado oeste, 180°)
 
         // Suelo de césped (textura pequeña repetida) y colisiones: plaza circular + pasillo.
-        var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, name = "Tex_Cesped" };
-        for (int i = 0; i < 32 * 32; i++) tex.SetPixel(i % 32, i / 32, new Color(0.30f, 0.55f, 0.18f) * (0.85f + 0.3f * (float)rnd.NextDouble()));
-        tex.Apply();
-        Guardar(tex, CARPETA + "/Tex_Cesped.asset");
-        var cesped = Guardar(new Material(Shader.Find("Universal Render Pipeline/Lit")), CARPETA + "/Mat_Cesped.mat");
-        cesped.SetTexture("_BaseMap", tex);
-        cesped.SetFloat("_Smoothness", 0f);
+        // Se reutiliza si ya existe (mismo GUID: la selva y la cinemática de los molletes comparten el césped).
+        var cesped = AssetDatabase.LoadAssetAtPath<Material>(CARPETA + "/Mat_Cesped.mat");
+        if (cesped == null)
+        {
+            var azar = new System.Random(7);
+            var tex = new Texture2D(32, 32, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, name = "Tex_Cesped" };
+            for (int i = 0; i < 32 * 32; i++) tex.SetPixel(i % 32, i / 32, new Color(0.30f, 0.55f, 0.18f) * (0.85f + 0.3f * (float)azar.NextDouble()));
+            tex.Apply();
+            Guardar(tex, CARPETA + "/Tex_Cesped.asset");
+            cesped = Guardar(new Material(Shader.Find("Universal Render Pipeline/Lit")), CARPETA + "/Mat_Cesped.mat");
+            cesped.SetTexture("_BaseMap", tex);
+            cesped.SetFloat("_Smoothness", 0f);
+        }
         Vector3 min = new Vector3(x0, 0f, zc - rMuro - 12f), max = c + new Vector3(rMuro + 12f, 0f, rMuro + 12f), tam = max - min;
         cesped.SetTextureScale("_BaseMap", new Vector2(tam.x / 8f, tam.z / 8f));
         var suelo = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -572,6 +579,37 @@ public static class ConstructorSelva
         entrada.laberinto = laberinto.gameObject;
         entrada.cierre = cierre.gameObject;
         entrada.pelea = pelea.gameObject;
+        return c;
+    }
+
+    // Las mismas ruinas del nivel (misma semilla) para la cinemática de los molletes, sin la lógica de la pelea.
+    // Quedan dentro de 'padre', movidas para que el centro de la plaza esté en el origen y las losas a ras de y = 0.
+    public static Transform RuinasParaCinematica(Transform padre)
+    {
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(MAPA);
+        if (tex == null) return null;
+        LeerMapa(tex);
+        if (!AssetDatabase.IsValidFolder(CARPETA)) AssetDatabase.CreateFolder("Assets/Project/Niveles", "Selva");
+        matVoxel = MaterialVoxel();
+        if (!CargarModelos()) return null;
+
+        rnd = new System.Random(SEMILLA);
+        var sal = Celdas(T.Salida, 0f);
+        if (sal.Count == 0) return null;
+        Vector3 a = sal[0], b = sal[0];
+        foreach (var p in sal) { a = Vector3.Min(a, p); b = Vector3.Max(b, p); }
+
+        var temporal = new GameObject("Laberinto_Temporal").transform;
+        rnd = new System.Random(SEMILLA + 1);
+        Vector3 c = Ruinas(temporal, a, b);
+        Object.DestroyImmediate(temporal.gameObject);
+
+        var ruinas = GameObject.Find("Ruinas").transform;
+        foreach (var quitar in new[] { "Linea_Ruinas", "Cierre_Entrada", "Pelea" })
+            if (ruinas.Find(quitar) is Transform t) Object.DestroyImmediate(t.gameObject);
+        ruinas.SetParent(padre, false);
+        ruinas.localPosition = -c + Vector3.down * 0.12f;
+        return ruinas;
     }
 
     // ---------------- Materiales y escena ----------------
