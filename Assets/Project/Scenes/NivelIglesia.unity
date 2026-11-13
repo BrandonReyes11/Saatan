@@ -1367,7 +1367,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 922251444}
   agitacion: 0.45
   velocidad: 5
@@ -5959,7 +5959,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 1146601483}
   agitacion: 0.45
   velocidad: 5
@@ -29475,7 +29475,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 267222543}
   agitacion: 0.45
   velocidad: 5
@@ -32686,7 +32686,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 158016699}
   agitacion: 0.45
   velocidad: 5
@@ -35124,7 +35124,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 158016699}
   agitacion: 0.45
   velocidad: 5
@@ -35758,7 +35758,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 521415989}
   agitacion: 0.45
   velocidad: 5
@@ -38264,7 +38264,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 1414954987}
   agitacion: 0.45
   velocidad: 5
@@ -56169,7 +56169,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 407181770}
   agitacion: 0.45
   velocidad: 5
@@ -57446,7 +57446,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 1233589490}
   agitacion: 0.45
   velocidad: 5
@@ -64524,7 +64524,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 521415989}
   agitacion: 0.45
   velocidad: 5
@@ -76851,7 +76851,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 2012987484}
   agitacion: 0.45
   velocidad: 5
@@ -80667,7 +80667,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 419f01821025b00429428db83078e6b8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ControlIktan
+  m_EditorClassIdentifier: Assembly-CSharp::IktanController
   velocidad: 4.5
   velocidadCuclillas: 2
   gravedad: -20
@@ -83347,7 +83347,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67a2c45d89fb6bf4f9a71e01b680bd7a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SeguirCamara
+  m_EditorClassIdentifier: Assembly-CSharp::FollowCamera
   objetivo: {fileID: 1099595851}
   distancia: 4.5
   alturaMira: 1.6
@@ -84968,7 +84968,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 1428867146}
   agitacion: 0.45
   velocidad: 5
@@ -87864,7 +87864,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 1022607206}
   agitacion: 0.45
   velocidad: 5
@@ -92283,7 +92283,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 1265943651}
   agitacion: 0.45
   velocidad: 5
@@ -100250,7 +100250,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 2018890610}
   agitacion: 0.45
   velocidad: 5
@@ -105041,7 +105041,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 1155900924}
   agitacion: 0.45
   velocidad: 5
@@ -116854,7 +116854,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 158016699}
   agitacion: 0.45
   velocidad: 5
@@ -133529,7 +133529,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b462801123514c4ab957a8556a0ebc8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlamaViva
+  m_EditorClassIdentifier: Assembly-CSharp::LivingFlame
   luz: {fileID: 407181770}
   agitacion: 0.45
   velocidad: 5

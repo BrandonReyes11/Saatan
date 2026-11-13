@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.Playables;
 
 [RequireComponent(typeof(PlayableDirector))]
-public class FinCinematica : MonoBehaviour
+public class CutsceneEnd : MonoBehaviour
 {
     public string escenaSiguiente = "";
     public bool sePuedeSaltar = true;
@@ -36,6 +36,6 @@ public class FinCinematica : MonoBehaviour
     void Terminar()
     {
         terminada = true;
-        if (!string.IsNullOrEmpty(escenaSiguiente)) Transicion.Cargar(escenaSiguiente);
+        if (!string.IsNullOrEmpty(escenaSiguiente)) SceneTransition.Cargar(escenaSiguiente);
     }
 }

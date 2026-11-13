@@ -52924,7 +52924,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67a2c45d89fb6bf4f9a71e01b680bd7a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SeguirCamara
+  m_EditorClassIdentifier: Assembly-CSharp::FollowCamera
   objetivo: {fileID: 1387585875}
   distancia: 4.5
   alturaMira: 1.6
@@ -52957,7 +52957,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 08bb18cddca34d79b530c02b7f129814, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CargaSelva
+  m_EditorClassIdentifier: Assembly-CSharp::JungleStreamer
   zonas: {fileID: 246329783}
   jugador: {fileID: 0}
   radioCarga: 50
@@ -162406,7 +162406,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 419f01821025b00429428db83078e6b8, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ControlIktan
+  m_EditorClassIdentifier: Assembly-CSharp::IktanController
   velocidad: 4.5
   velocidadCuclillas: 2
   gravedad: -20
@@ -217062,7 +217062,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c81ed7e376e741c4b8a1479822797225, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EntradaRuinas
+  m_EditorClassIdentifier: Assembly-CSharp::RuinsEntrance
   laberinto: {fileID: 1258379212}
   cierre: {fileID: 1888176155}
   pelea: {fileID: 308281882}

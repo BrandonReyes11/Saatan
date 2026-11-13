@@ -6,9 +6,9 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Timeline;
-using static PiezasCinematica;
+using static CutsceneParts;
 
-public static class ConstructorCinematicas
+public static class CutsceneBuilder
 {
     // ---------------- Molletes: el Nahual derrotado se vuelve luz y aparecen unos molletes ----------------
 
@@ -21,7 +21,7 @@ public static class ConstructorCinematicas
 
         // Escenario: las mismas ruinas del nivel de la selva (mismo constructor y misma semilla: muros, pilares,
         // losas, altar, musgo y la vegetación de alrededor), con el centro de la plaza en el origen.
-        if (ConstructorSelva.RuinasParaCinematica(raiz) == null)
+        if (JungleBuilder.RuinasParaCinematica(raiz) == null)
             Debug.LogWarning("No se pudieron construir las ruinas de la selva para la cinemática.");
         var cesped = AssetDatabase.LoadAssetAtPath<Material>("Assets/Project/Niveles/Selva/Mat_Cesped.mat");
         Cubo(raiz, new Vector3(0f, -0.4f, 0f), new Vector3(160f, 0.5f, 160f), cesped != null ? cesped : Mat("Cesped", new Color(0.30f, 0.52f, 0.18f)));

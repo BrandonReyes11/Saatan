@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(CharacterController))]
-public class ControlIktan : MonoBehaviour
+public class IktanController : MonoBehaviour
 {
     public float velocidad = 4.5f;
     public float velocidadCuclillas = 2f;

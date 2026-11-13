@@ -10,7 +10,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public static class ConstructorCinematica
+public static class ChurchCutsceneBuilder
 {
     const string ESCENA = "Assets/Project/Scenes/CinematicaIglesia.unity";
     const string ARTE = "Assets/Project/Prefabs/Environment/Iglesia";
@@ -241,7 +241,7 @@ public static class ConstructorCinematica
 
     static void Timeline()
     {
-        var d = PiezasCinematica.Director(raiz, "Iglesia", "NivelIglesia", out var tl);
+        var d = CutsceneParts.Director(raiz, "Iglesia", "NivelIglesia", out var tl);
         // Línea de la escalera: de y 0 (z -74) a y ALTO (z -34); luego el camino y el pórtico hasta la puerta.
         System.Func<float, float, Vector3[]> Ruta = (x, z0) => new[]
         {
@@ -250,15 +250,15 @@ public static class ConstructorCinematica
         };
         const float vel = 2f, espera = 1.5f;
         Vector3[] rutaIktan = Ruta(-0.9f, -82f), rutaAbbi = Ruta(1.1f, -83.5f);
-        float dur = espera + PiezasCinematica.LargoRuta(rutaAbbi) / vel + 3.5f;   // + unos segundos frente a la puerta
+        float dur = espera + CutsceneParts.LargoRuta(rutaAbbi) / vel + 3.5f;   // + unos segundos frente a la puerta
 
         foreach (var (archivo, ruta, alto) in new[] { ("IktanVoxel", rutaIktan, 1.4f), ("AbbiVoxel", rutaAbbi, 0.55f) })
         {
-            var p = PiezasCinematica.Personaje(archivo, raiz, ruta[0], 0f, alto);
-            p.gameObject.AddComponent<AndarVoxel>().pasosPorMetro = archivo == "AbbiVoxel" ? 4f : 2.2f;
-            PiezasCinematica.PistaMovimiento(tl, d, p.gameObject, dur, t =>
+            var p = CutsceneParts.Personaje(archivo, raiz, ruta[0], 0f, alto);
+            p.gameObject.AddComponent<VoxelWalk>().pasosPorMetro = archivo == "AbbiVoxel" ? 4f : 2.2f;
+            CutsceneParts.PistaMovimiento(tl, d, p.gameObject, dur, t =>
             {
-                var (pos, dir) = PiezasCinematica.EnRuta(ruta, vel, espera, t);
+                var (pos, dir) = CutsceneParts.EnRuta(ruta, vel, espera, t);
                 dir.y = 0f;
                 return (pos, Quaternion.LookRotation(dir.sqrMagnitude > 0.0001f ? dir : Vector3.forward));
             });
@@ -277,7 +277,7 @@ public static class ConstructorCinematica
         for (int i = 0; i < n; i++)
         {
             float t = i / (float)fps;
-            Vector3 iktan = PiezasCinematica.EnRuta(rutaIktan, vel, espera, t).pos;
+            Vector3 iktan = CutsceneParts.EnRuta(rutaIktan, vel, espera, t).pos;
             c = Vector3.Lerp(c, iktan + distancia, 1f - Mathf.Exp(-2f / fps));
             Vector3 mira = Vector3.Lerp(iktan + Vector3.up, objetivo, Mathf.SmoothStep(0f, 1f, (t / dur - 0.8f) / 0.2f));
             r = Quaternion.Slerp(r, Quaternion.LookRotation(mira - c), 1f - Mathf.Exp(-5f / fps));
@@ -285,7 +285,7 @@ public static class ConstructorCinematica
             rotaciones[i] = r;
         }
         cam.transform.SetPositionAndRotation(posiciones[0], rotaciones[0]);
-        PiezasCinematica.PistaMovimiento(tl, d, cam.gameObject, dur, t =>
+        CutsceneParts.PistaMovimiento(tl, d, cam.gameObject, dur, t =>
         {
             int i = Mathf.Clamp(Mathf.RoundToInt(t * fps), 0, n - 1);
             return (posiciones[i], rotaciones[i]);

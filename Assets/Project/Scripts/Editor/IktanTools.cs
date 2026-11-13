@@ -1,10 +1,10 @@
 // Saatan Historia - Herramientas del editor: jugador de prueba y fuego vivo.
-// Requiere en Assets/Scripts: ControlIktan.cs, SeguirCamara.cs y LlamaViva.cs
+// Requiere en Assets/Scripts: IktanController.cs, FollowCamera.cs y LivingFlame.cs
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-public static class HerramientasIktan
+public static class IktanTools
 {
     [MenuItem("Saatan/Crear jugador de prueba (Iktan)")]
     public static void CrearJugador()
@@ -54,14 +54,14 @@ public static class HerramientasIktan
         luz.intensity = 2.5f;
         luz.shadows = LightShadows.None;
 
-        var control = raiz.AddComponent<ControlIktan>();
+        var control = raiz.AddComponent<IktanController>();
         control.visual = bola.transform;
 
         var cam = Camera.main;
         if (cam != null)
         {
-            var seguir = cam.GetComponent<SeguirCamara>();
-            if (seguir == null) seguir = cam.gameObject.AddComponent<SeguirCamara>();
+            var seguir = cam.GetComponent<FollowCamera>();
+            if (seguir == null) seguir = cam.gameObject.AddComponent<FollowCamera>();
             seguir.objetivo = raiz.transform;
             seguir.AjustarYa();
         }
@@ -84,15 +84,15 @@ public static class HerramientasIktan
         Debug.Log("Llamas animadas: " + n);
     }
 
-    // Agrega LlamaViva a cada llama y la une con su luz más cercana.
+    // Agrega LivingFlame a cada llama y la une con su luz más cercana.
     public static int DarVidaAlFuego(GameObject raiz)
     {
         int n = 0;
         foreach (var t in raiz.GetComponentsInChildren<Transform>(true))
         {
             if (t.name != "Llama") continue;
-            var viva = t.GetComponent<LlamaViva>();
-            if (viva == null) viva = t.gameObject.AddComponent<LlamaViva>();
+            var viva = t.GetComponent<LivingFlame>();
+            if (viva == null) viva = t.gameObject.AddComponent<LivingFlame>();
 
             Light mejor = null;
             float menor = float.MaxValue;

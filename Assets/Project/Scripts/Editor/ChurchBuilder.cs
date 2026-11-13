@@ -17,9 +17,9 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public static class ConstructorIglesia
+public static class ChurchBuilder
 {
-    enum Tipo { Piso, Limite, Banca, Caja, Vela, Altar, Vitral, Diablo, Inicio, Ofrenda }
+    enum Cell { Piso, Limite, Banca, Caja, Vela, Altar, Vitral, Diablo, Inicio, Ofrenda }
 
     const float ESCALA = 1.5f;              // metros por píxel del mapa (más grande y amplia)
     const float RadioPared = 19.6f * ESCALA;
@@ -31,18 +31,18 @@ public static class ConstructorIglesia
     const int VitralDesde = 12, VitralFilas = 5;  // vitrales altos: de 12 a 17 m
     const int Segmentos = 120;      // 3 grados cada uno
 
-    static readonly (Color32 color, Tipo tipo)[] paleta =
+    static readonly (Color32 color, Cell tipo)[] paleta =
     {
-        (new Color32(255, 255, 255, 255), Tipo.Piso),
-        (new Color32(0, 0, 0, 255),       Tipo.Limite),
-        (new Color32(140, 80, 30, 255),   Tipo.Banca),
-        (new Color32(255, 150, 0, 255),   Tipo.Caja),
-        (new Color32(255, 105, 180, 255), Tipo.Vela),
-        (new Color32(128, 128, 128, 255), Tipo.Altar),
-        (new Color32(255, 220, 0, 255),   Tipo.Vitral),
-        (new Color32(230, 0, 0, 255),     Tipo.Diablo),
-        (new Color32(0, 100, 255, 255),   Tipo.Inicio),
-        (new Color32(160, 40, 200, 255),  Tipo.Ofrenda),
+        (new Color32(255, 255, 255, 255), Cell.Piso),
+        (new Color32(0, 0, 0, 255),       Cell.Limite),
+        (new Color32(140, 80, 30, 255),   Cell.Banca),
+        (new Color32(255, 150, 0, 255),   Cell.Caja),
+        (new Color32(255, 105, 180, 255), Cell.Vela),
+        (new Color32(128, 128, 128, 255), Cell.Altar),
+        (new Color32(255, 220, 0, 255),   Cell.Vitral),
+        (new Color32(230, 0, 0, 255),     Cell.Diablo),
+        (new Color32(0, 100, 255, 255),   Cell.Inicio),
+        (new Color32(160, 40, 200, 255),  Cell.Ofrenda),
     };
 
     static readonly Vector2Int[] dirs = { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1) };
@@ -94,7 +94,7 @@ public static class ConstructorIglesia
 
     static readonly Dictionary<string, Material> cache = new Dictionary<string, Material>();
 
-    class Acum
+    class MeshAccumulator
     {
         public List<Vector3> v = new List<Vector3>();
         public List<Vector3> n = new List<Vector3>();
@@ -144,14 +144,14 @@ public static class ConstructorIglesia
 
         // Vitrales: cada mancha amarilla se convierte en una ventana dentro de la pared.
         var ventanas = new HashSet<int>();
-        foreach (var c in Componentes(mapa, w, h, Tipo.Vitral))
+        foreach (var c in Componentes(mapa, w, h, Cell.Vitral))
         {
             Vector3 centro; int ancho, fondo;
             Rango(c, w, h, out centro, out ancho, out fondo);
             float ang = Mathf.Atan2(centro.z, centro.x) * Mathf.Rad2Deg;
             if (ang < 0f) ang += 360f;
             ventanas.Add(Mathf.FloorToInt(ang / (360f / Segmentos)) % Segmentos);
-            foreach (var celda in c) mapa[celda.x, celda.y] = (int)Tipo.Limite;
+            foreach (var celda in c) mapa[celda.x, celda.y] = (int)Cell.Limite;
         }
 
         // El centro y el lugar de los pilares de la nave quedan libres.
@@ -159,10 +159,10 @@ public static class ConstructorIglesia
             for (int x = 0; x < w; x++)
             {
                 Vector3 p = Pos(x, y, w, h);
-                var t = (Tipo)mapa[x, y];
+                var t = (Cell)mapa[x, y];
                 bool libre = Mathf.Abs(p.x) < LadoPilares + 1.5f && Mathf.Abs(p.z) < LadoPilares + 1.5f;
                 foreach (var c in PosNave()) if ((c - p).sqrMagnitude < 2.2f * 2.2f) libre = true;
-                if (libre && (t == Tipo.Banca || t == Tipo.Caja || t == Tipo.Vela)) mapa[x, y] = (int)Tipo.Piso;
+                if (libre && (t == Cell.Banca || t == Cell.Caja || t == Cell.Vela)) mapa[x, y] = (int)Cell.Piso;
             }
 
         // ---- Piso con baldosas, alfombra y colisiones (el límite NO se ve) ----
@@ -178,7 +178,7 @@ public static class ConstructorIglesia
             {
                 if (mapa[x, y] < 0) continue;
                 Vector3 p = Pos(x, y, w, h);
-                bool limite = mapa[x, y] == (int)Tipo.Limite;
+                bool limite = mapa[x, y] == (int)Cell.Limite;
 
                 if (!limite)
                 {
@@ -227,19 +227,19 @@ public static class ConstructorIglesia
         Polvo(raiz);
 
         // ---- Objetos ----
-        foreach (var c in Componentes(mapa, w, h, Tipo.Banca))
+        foreach (var c in Componentes(mapa, w, h, Cell.Banca))
         {
             Vector3 centro; int ancho, fondo;
             Rango(c, w, h, out centro, out ancho, out fondo);
             Banca(raiz, centro, ancho, fondo);
         }
-        foreach (var c in Componentes(mapa, w, h, Tipo.Altar))
+        foreach (var c in Componentes(mapa, w, h, Cell.Altar))
         {
             Vector3 centro; int ancho, fondo;
             Rango(c, w, h, out centro, out ancho, out fondo);
             Altar(raiz, centro, ancho, fondo);
         }
-        foreach (var c in Componentes(mapa, w, h, Tipo.Ofrenda))
+        foreach (var c in Componentes(mapa, w, h, Cell.Ofrenda))
         {
             Vector3 centro; int ancho, fondo;
             Rango(c, w, h, out centro, out ancho, out fondo);
@@ -249,22 +249,22 @@ public static class ConstructorIglesia
             for (int x = 0; x < w; x++)
             {
                 Vector3 p = Pos(x, y, w, h);
-                switch ((Tipo)mapa[x, y])
+                switch ((Cell)mapa[x, y])
                 {
-                    case Tipo.Caja:   Caja(raiz, p, x * 7 + y * 13); break;
-                    case Tipo.Vela:   Candelabro(raiz, p); break;
-                    case Tipo.Diablo: Marcador(raiz, "Aparicion_Diablo", p, 1.2f, "MarcadorDiablo"); break;
-                    case Tipo.Inicio: Marcador(raiz, "Inicio_Jugador", p, 0.8f, "MarcadorInicio"); break;
+                    case Cell.Caja:   Caja(raiz, p, x * 7 + y * 13); break;
+                    case Cell.Vela:   Candelabro(raiz, p); break;
+                    case Cell.Diablo: Marcador(raiz, "Aparicion_Diablo", p, 1.2f, "MarcadorDiablo"); break;
+                    case Cell.Inicio: Marcador(raiz, "Inicio_Jugador", p, 0.8f, "MarcadorInicio"); break;
                 }
             }
 
         Abandono(raiz);
-        // Al terminar el nivel (vencer al Diablo), llamar a  Fin_Nivel.GetComponent<CambiarEscena>().Cargar():
+        // Al terminar el nivel (vencer al Diablo), llamar a  Fin_Nivel.GetComponent<SceneChanger>().Cargar():
         // pasa a la cinemática del altar.
-        Grupo(raiz, "Fin_Nivel", Vector3.zero).gameObject.AddComponent<CambiarEscena>().escena = "AltarCInematica";
-        HerramientasIktan.DarVidaAlFuego(raiz.gameObject);
+        Grupo(raiz, "Fin_Nivel", Vector3.zero).gameObject.AddComponent<SceneChanger>().escena = "AltarCInematica";
+        IktanTools.DarVidaAlFuego(raiz.gameObject);
         ConfigurarEscena();
-        HerramientasIktan.CrearJugador();   // Iktan en el nuevo punto de inicio, con la cámara en tercera persona
+        IktanTools.CrearJugador();   // Iktan en el nuevo punto de inicio, con la cámara en tercera persona
 
         AssetDatabase.SaveAssets();
         EditorSceneManager.MarkAllScenesDirty();
@@ -284,7 +284,7 @@ public static class ConstructorIglesia
         var abreAlto = new HashSet<int>();
         foreach (int k in altas) { abreAlto.Add(k); abreAlto.Add((k + 1) % Segmentos); }
 
-        var tonos = new Acum[] { new Acum(), new Acum(), new Acum() };
+        var tonos = new MeshAccumulator[] { new MeshAccumulator(), new MeshAccumulator(), new MeshAccumulator() };
         float paso = 360f / Segmentos;
 
         for (int i = 0; i < Segmentos; i++)
@@ -330,7 +330,7 @@ public static class ConstructorIglesia
         return new Vector3(RadioPared * Mathf.Cos(ang), y, RadioPared * Mathf.Sin(ang));
     }
 
-    static void Quad(Acum a, Vector3 A, Vector3 B, Vector3 C, Vector3 D, Vector3 normal)
+    static void Quad(MeshAccumulator a, Vector3 A, Vector3 B, Vector3 C, Vector3 D, Vector3 normal)
     {
         int i = a.v.Count;
         a.v.Add(A); a.v.Add(B); a.v.Add(C); a.v.Add(D);
@@ -446,7 +446,7 @@ public static class ConstructorIglesia
     {
         const int anillos = 10;
         const float rOculo = 3f;
-        var tonos = new[] { new Acum(), new Acum() };
+        var tonos = new[] { new MeshAccumulator(), new MeshAccumulator() };
         float paso = 360f / Segmentos * Mathf.Deg2Rad, tMax = Mathf.Acos(rOculo / RadioPared);
         System.Func<float, float, Vector3> P = (a, t) =>
             new Vector3(RadioPared * Mathf.Cos(t) * Mathf.Cos(a), AltoPared + AltoCupula * Mathf.Sin(t), RadioPared * Mathf.Cos(t) * Mathf.Sin(a));
@@ -960,7 +960,7 @@ public static class ConstructorIglesia
         centro = new Vector3(((minX + maxX) / 2f - w / 2f + 0.5f) * ESCALA, 0f, ((minY + maxY) / 2f - h / 2f + 0.5f) * ESCALA);
     }
 
-    static List<List<Vector2Int>> Componentes(int[,] mapa, int w, int h, Tipo t)
+    static List<List<Vector2Int>> Componentes(int[,] mapa, int w, int h, Cell t)
     {
         var visto = new bool[w, h];
         var res = new List<List<Vector2Int>>();
@@ -990,9 +990,9 @@ public static class ConstructorIglesia
         return res;
     }
 
-    static Tipo Clasificar(Color32 p)
+    static Cell Clasificar(Color32 p)
     {
-        Tipo mejor = Tipo.Piso;
+        Cell mejor = Cell.Piso;
         int mejorDist = int.MaxValue;
         foreach (var (c, t) in paleta)
         {
@@ -1074,7 +1074,7 @@ public static class ConstructorIglesia
         return m;
     }
 
-    // Interior en penumbra: la luz entra por los vitrales y el rosetón. Fondo negro, cámara de SeguirCamara.
+    // Interior en penumbra: la luz entra por los vitrales y el rosetón. Fondo negro, cámara de FollowCamera.
     static void ConfigurarEscena()
     {
         RenderSettings.skybox = null;

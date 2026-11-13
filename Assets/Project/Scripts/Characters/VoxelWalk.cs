@@ -4,7 +4,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class AndarVoxel : MonoBehaviour
+public class VoxelWalk : MonoBehaviour
 {
     public float pasosPorMetro = 2.2f;
     public float angulo = 35f;

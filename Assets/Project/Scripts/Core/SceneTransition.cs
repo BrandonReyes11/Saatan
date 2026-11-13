@@ -1,16 +1,16 @@
 // Saatan Historia - Transición entre escenas: fundido a negro, carga la escena y vuelve a aparecer la imagen.
-// Uso desde cualquier script: Transicion.Cargar("NivelSelva");
+// Uso desde cualquier script: SceneTransition.Cargar("NivelSelva");
 // Se crea sola la primera vez y sobrevive a los cambios de escena (DontDestroyOnLoad).
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public class Transicion : MonoBehaviour
+public class SceneTransition : MonoBehaviour
 {
     public static float duracion = 0.7f;   // segundos del fundido (de ida y de vuelta)
 
-    static Transicion instancia;
+    static SceneTransition instancia;
     CanvasGroup grupo;
     bool cargando;
 
@@ -20,19 +20,19 @@ public class Transicion : MonoBehaviour
     {
         if (!Application.CanStreamedLevelBeLoaded(escena))
         {
-            Debug.LogError("Transicion: la escena '" + escena + "' no está en la lista de escenas del Build (File > Build Profiles).");
+            Debug.LogError("SceneTransition: la escena '" + escena + "' no está en la lista de escenas del Build (File > Build Profiles).");
             return;
         }
         var t = Instancia();
         if (!t.cargando) t.StartCoroutine(t.Ir(escena));
     }
 
-    static Transicion Instancia()
+    static SceneTransition Instancia()
     {
         if (instancia != null) return instancia;
-        var go = new GameObject("Transicion");
+        var go = new GameObject("SceneTransition");
         DontDestroyOnLoad(go);
-        instancia = go.AddComponent<Transicion>();
+        instancia = go.AddComponent<SceneTransition>();
 
         var canvas = go.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;

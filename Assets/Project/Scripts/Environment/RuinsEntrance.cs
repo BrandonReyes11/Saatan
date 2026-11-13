@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(BoxCollider))]
-public class EntradaRuinas : MonoBehaviour
+public class RuinsEntrance : MonoBehaviour
 {
     public GameObject laberinto;     // Selva_Laberinto
     public GameObject cierre;        // puerta + colisión que bloquea el regreso (empieza desactivada)
@@ -17,11 +17,11 @@ public class EntradaRuinas : MonoBehaviour
 
     void OnTriggerEnter(Collider otro)
     {
-        if (usada || otro.GetComponentInParent<ControlIktan>() == null) return;
+        if (usada || otro.GetComponentInParent<IktanController>() == null) return;
         usada = true;
 
         // La carga por zonas ya no hace falta: su lista apunta al laberinto que se borra.
-        foreach (var c in FindObjectsByType<CargaSelva>(FindObjectsSortMode.None)) c.enabled = false;
+        foreach (var c in FindObjectsByType<JungleStreamer>(FindObjectsSortMode.None)) c.enabled = false;
         if (laberinto != null) Destroy(laberinto);
         if (cierre != null) cierre.SetActive(true);
         if (pelea != null) pelea.SetActive(true);

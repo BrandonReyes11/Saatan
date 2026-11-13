@@ -4,7 +4,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class SeguirCamara : MonoBehaviour
+public class FollowCamera : MonoBehaviour
 {
     public Transform objetivo;
     public float distancia = 4.5f;        // metros detrás de Iktan

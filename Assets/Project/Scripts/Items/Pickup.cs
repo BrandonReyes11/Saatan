@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(Collider))]
-public class Recogible : MonoBehaviour
+public class Pickup : MonoBehaviour
 {
     public string objeto = "Mollete";
     public UnityEvent alRecoger;
@@ -17,7 +17,7 @@ public class Recogible : MonoBehaviour
 
     void OnTriggerEnter(Collider otro)
     {
-        if (otro.GetComponentInParent<ControlIktan>() == null) return;
+        if (otro.GetComponentInParent<IktanController>() == null) return;
         inventario[objeto] = Cantidad(objeto) + 1;
         alRecoger.Invoke();
         Debug.Log("Iktan recogió: " + objeto + " (" + Cantidad(objeto) + ")");

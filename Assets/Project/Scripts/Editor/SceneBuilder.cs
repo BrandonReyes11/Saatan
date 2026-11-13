@@ -1,5 +1,5 @@
 // Saatan Historia - Crea las escenas del juego y las agrega al Build.
-// Requiere: Assets/Scripts/CambiarEscena.cs, ConstructorSelva.cs y HerramientasIktan.cs
+// Requiere: Assets/Scripts/SceneChanger.cs, JungleBuilder.cs y IktanTools.cs
 //
 // Menú: Saatan > Escenas > Crear menú principal y nivel Selva
 //   - Assets/Project/Scenes/MenuPrincipal.unity : título + botón "Jugar".
@@ -7,7 +7,7 @@
 //                                          con el jugador de prueba (Iktan).
 //   - Las agrega a la lista de escenas del Build (el menú queda en el índice 0).
 //
-// El botón "Jugar" llama a CambiarEscena.CargarEscena("NivelSelva") desde su
+// El botón "Jugar" llama a SceneChanger.CargarEscena("NivelSelva") desde su
 // evento On Click (), tal como se configura a mano en el video de apoyo.
 //
 // Menú: Saatan > Escenas > Reconstruir NivelSelva
@@ -24,12 +24,12 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public static class ConstructorEscenas
+public static class SceneBuilder
 {
     public const string CARPETA = "Assets/Project/Scenes";
     public const string ESCENA_MENU = "MenuPrincipal";
     public const string ESCENA_SELVA = "NivelSelva";
-    const string MAPA_SELVA = ConstructorSelva.MAPA;
+    const string MAPA_SELVA = JungleBuilder.MAPA;
 
     static string Ruta(string nombre) => CARPETA + "/" + nombre + ".unity";
 
@@ -87,8 +87,8 @@ public static class ConstructorEscenas
             ? EditorSceneManager.OpenScene(Ruta(ESCENA_SELVA), OpenSceneMode.Single)
             : EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
-        ConstructorSelva.ConstruirDesdeTextura(mapa);
-        HerramientasIktan.CrearJugador();
+        JungleBuilder.ConstruirDesdeTextura(mapa);
+        IktanTools.CrearJugador();
 
         EditorSceneManager.SaveScene(escena, Ruta(ESCENA_SELVA));
         AgregarAlBuild();
@@ -168,7 +168,7 @@ public static class ConstructorEscenas
         camGo.transform.position = new Vector3(0f, 1f, -10f);
 
         // Objeto que hace el cambio de escena.
-        var gestor = new GameObject("GestorEscenas").AddComponent<CambiarEscena>();
+        var gestor = new GameObject("GestorEscenas").AddComponent<SceneChanger>();
 
         // EventSystem (con el módulo del Input System nuevo, que es el activo en el proyecto).
         var es = new GameObject("EventSystem");
@@ -203,7 +203,7 @@ public static class ConstructorEscenas
         var boton = Boton(canvasGo.transform, "Boton_Jugar", "Jugar", fuente);
         Colocar((RectTransform)boton.transform, new Vector2(0.5f, 0.35f), new Vector2(420f, 110f));
 
-        // On Click () -> GestorEscenas.CambiarEscena.CargarEscena("NivelSelva")
+        // On Click () -> GestorEscenas.SceneChanger.CargarEscena("NivelSelva")
         UnityEventTools.AddStringPersistentListener(
             boton.onClick,
             new UnityAction<string>(gestor.CargarEscena),
@@ -277,7 +277,7 @@ public static class ConstructorEscenas
     {
         if (!Sobrescribir(ESCENA_SELVA)) return true;
 
-        // Cámara + luz direccional por defecto (ConstructorSelva las ajusta).
+        // Cámara + luz direccional por defecto (JungleBuilder las ajusta).
         Scene escena = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
         var mapa = AssetDatabase.LoadAssetAtPath<Texture2D>(MAPA_SELVA);
@@ -285,8 +285,8 @@ public static class ConstructorEscenas
 
         if (ok)
         {
-            ConstructorSelva.ConstruirDesdeTextura(mapa);
-            HerramientasIktan.CrearJugador();
+            JungleBuilder.ConstruirDesdeTextura(mapa);
+            IktanTools.CrearJugador();
         }
         else
         {

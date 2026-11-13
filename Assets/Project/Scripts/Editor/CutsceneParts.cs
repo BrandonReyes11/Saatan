@@ -10,7 +10,7 @@ using UnityEngine.Playables;
 using UnityEngine.Rendering;
 using UnityEngine.Timeline;
 
-public static class PiezasCinematica
+public static class CutsceneParts
 {
     public const string CARPETA = "Assets/Project/Niveles/Cinematica";
     const string PERSONAJES = "Assets/Project/Prefabs/Characters/";
@@ -53,7 +53,7 @@ public static class PiezasCinematica
     }
 
     // ---------------- Timeline (método de las cinemáticas) ----------------
-    // Cada cinemática tiene un objeto "Cinematica" con PlayableDirector + FinCinematica y un TimelineAsset
+    // Cada cinemática tiene un objeto "Cinematica" con PlayableDirector + CutsceneEnd y un TimelineAsset
     // (Niveles/Cinematica/Timeline_<nombre>.playable) con pistas de animación, activación y control.
     // Se puede abrir y retocar en Window > Sequencing > Timeline.
 
@@ -66,7 +66,7 @@ public static class PiezasCinematica
         d.playableAsset = tl;
         d.playOnAwake = true;
         d.extrapolationMode = DirectorWrapMode.Hold;   // al terminar se queda en el último cuadro
-        go.AddComponent<FinCinematica>().escenaSiguiente = escenaSiguiente;
+        go.AddComponent<CutsceneEnd>().escenaSiguiente = escenaSiguiente;
         return d;
     }
 
@@ -286,7 +286,7 @@ public static class PiezasCinematica
         l.range = 3.5f;
         l.intensity = 1.3f;
         l.shadows = LightShadows.None;
-        var viva = llama.gameObject.AddComponent<LlamaViva>();
+        var viva = llama.gameObject.AddComponent<LivingFlame>();
         viva.luz = l;
     }
 
@@ -359,7 +359,7 @@ public static class PiezasCinematica
         c.isTrigger = true;
         c.center = Vector3.up * tamColision.y / 2f;
         c.size = tamColision;
-        g.gameObject.AddComponent<Recogible>().objeto = nombre;
+        g.gameObject.AddComponent<Pickup>().objeto = nombre;
         var pf = PrefabUtility.SaveAsPrefabAsset(g.gameObject, ruta);
         Object.DestroyImmediate(g.gameObject);
         return pf;

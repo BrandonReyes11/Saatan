@@ -5,7 +5,7 @@
 // Hay claros con árboles más pequeños, carteles de flecha discretos hacia la salida y, al final, unas
 // ruinas abiertas (Prefabs/Environment/Ruinas) donde es la pelea: al cruzar su entrada se borra el laberinto.
 // Optimización: modelos LOD2, suelo en un solo quad con textura, colisiones con cajas,
-// y todo agrupado en zonas de ZONA x ZONA m que CargaSelva activa solo cerca del jugador (con neblina).
+// y todo agrupado en zonas de ZONA x ZONA m que JungleStreamer activa solo cerca del jugador (con neblina).
 // Menú: Saatan > Construir selva (Laberinto)   |   Saatan > Escenas > Reconstruir NivelSelva
 
 using System.Collections.Generic;
@@ -14,43 +14,43 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public static class ConstructorSelva
+public static class JungleBuilder
 {
     public const string MAPA = "Assets/Project/Niveles/Mapas/selva_laberinto.png";
     const string ARTE = "Assets/Project/Prefabs/Environment/Selva/", CARPETA = "Assets/Project/Niveles/Selva", RAIZ = "Selva_Laberinto";
     const int ZONA = 16, SEMILLA = 2026;
     const float ALTO_MURO = 4f;
 
-    enum T { Vacio, Piso, Borde, Pasto, Bosque, Inicio, Salida }
+    enum Cell { Vacio, Piso, Borde, Pasto, Bosque, Inicio, Salida }
 
-    static readonly Dictionary<Color32, T> paleta = new Dictionary<Color32, T>
+    static readonly Dictionary<Color32, Cell> paleta = new Dictionary<Color32, Cell>
     {
-        { new Color32(255, 255, 255, 255), T.Piso },   { new Color32(0, 0, 0, 255), T.Borde },
-        { new Color32(0, 170, 0, 255), T.Pasto },      { new Color32(0, 90, 0, 255), T.Bosque },
-        { new Color32(0, 100, 255, 255), T.Inicio },   { new Color32(255, 105, 180, 255), T.Salida },
+        { new Color32(255, 255, 255, 255), Cell.Piso },   { new Color32(0, 0, 0, 255), Cell.Borde },
+        { new Color32(0, 170, 0, 255), Cell.Pasto },      { new Color32(0, 90, 0, 255), Cell.Bosque },
+        { new Color32(0, 100, 255, 255), Cell.Inicio },   { new Color32(255, 105, 180, 255), Cell.Salida },
     };
 
-    // Modelo: archivo, altura final mínima y máxima (m), peso. Iktan mide ~1.8 m.
-    class Modelo { public string archivo; public float min, max, peso, alto; public GameObject prefab; }
-    static Modelo[] Lista(params (string, float, float, float)[] l) =>
-        System.Array.ConvertAll(l, m => new Modelo { archivo = m.Item1, min = m.Item2, max = m.Item3, peso = m.Item4 });
+    // Model: archivo, altura final mínima y máxima (m), peso. Iktan mide ~1.8 m.
+    class Model { public string archivo; public float min, max, peso, alto; public GameObject prefab; }
+    static Model[] Lista(params (string, float, float, float)[] l) =>
+        System.Array.ConvertAll(l, m => new Model { archivo = m.Item1, min = m.Item2, max = m.Item3, peso = m.Item4 });
 
-    static readonly Modelo[] arboles = Lista(("acacia_australiana_01", 8, 10, 1), ("arvore_folhas_largas_01", 7, 9, 1.2f),
+    static readonly Model[] arboles = Lista(("acacia_australiana_01", 8, 10, 1), ("arvore_folhas_largas_01", 7, 9, 1.2f),
         ("arvore_torta_floresta_01", 7, 9, 1), ("arvore_casca_rugosa_01", 9, 11, 0.8f), ("eucalipto_alto_01", 13, 16, 0.3f),
         ("eucalipto_alto_02", 12, 15, 0.5f));
-    static readonly Modelo[] arbolesPequenos = Lista(("arvore_torta_floresta_01", 4, 5.5f, 1), ("arvore_folhas_largas_01", 4, 5.5f, 1),
+    static readonly Model[] arbolesPequenos = Lista(("arvore_torta_floresta_01", 4, 5.5f, 1), ("arvore_folhas_largas_01", 4, 5.5f, 1),
         ("acacia_australiana_01", 4.5f, 6, 0.8f), ("samambaia_arborea_01", 3, 4, 1));
-    static readonly Modelo[] gigante = Lista(("arvore_copa_larga_hero_01", 12, 14, 1));
-    static readonly Modelo[] arbustos = Lista(("arbusto_arredondado_01", 1.6f, 2.2f, 1), ("arbusto_irregular_01", 1.8f, 2.5f, 1),
+    static readonly Model[] gigante = Lista(("arvore_copa_larga_hero_01", 12, 14, 1));
+    static readonly Model[] arbustos = Lista(("arbusto_arredondado_01", 1.6f, 2.2f, 1), ("arbusto_irregular_01", 1.8f, 2.5f, 1),
         ("arbusto_folhas_largas_01", 1.2f, 1.7f, 0.8f), ("moita_seca_01", 1.2f, 1.6f, 0.4f),
         ("samambaia_arborea_01", 2.8f, 3.6f, 0.6f), ("samambaia_larga_hero_01", 1.3f, 1.7f, 0.6f));
-    static readonly Modelo[] hierba = Lista(("capim_alto_estilizado_01", 1.3f, 1.7f, 1), ("samambaia_media_01", 0.8f, 1.1f, 0.3f));
-    static readonly Modelo[] plantas = Lista(("grama_baixa_x_01", 0.2f, 0.3f, 1), ("grama_media_x_01", 0.4f, 0.6f, 1),
+    static readonly Model[] hierba = Lista(("capim_alto_estilizado_01", 1.3f, 1.7f, 1), ("samambaia_media_01", 0.8f, 1.1f, 0.3f));
+    static readonly Model[] plantas = Lista(("grama_baixa_x_01", 0.2f, 0.3f, 1), ("grama_media_x_01", 0.4f, 0.6f, 1),
         ("folhagem_rasteira_01", 0.12f, 0.2f, 0.8f), ("samambaia_baixa_densa_01", 0.3f, 0.4f, 0.6f), ("planta_roteada_01", 0.7f, 0.9f, 0.3f));
-    static readonly Modelo[] piedras = Lista(("pedra_01", 0.5f, 0.8f, 1), ("pedra_02", 0.4f, 0.6f, 1), ("pedra_03", 0.4f, 0.6f, 1),
+    static readonly Model[] piedras = Lista(("pedra_01", 0.5f, 0.8f, 1), ("pedra_02", 0.4f, 0.6f, 1), ("pedra_03", 0.4f, 0.6f, 1),
         ("pedra_04", 0.8f, 1.2f, 0.5f), ("pedra_05", 1f, 1.5f, 0.4f));
 
-    static T[,] mapa;
+    static Cell[,] mapa;
     static int w, h;
     static System.Random rnd;
     static Material matVoxel;
@@ -97,7 +97,7 @@ public static class ConstructorSelva
 
         // Árboles más separados; en los "claros" (ruido de Perlin) son pequeños para que no se sienta saturado.
         Progreso("Árboles del borde", 0.3f);
-        foreach (var p in Celdas(T.Borde, 0.3f))
+        foreach (var p in Celdas(Cell.Borde, 0.3f))
         {
             bool claro = Claro(p);
             if (Cerca(troncos, p, claro ? 4f : 5.5f) || (!claro && rnd.NextDouble() < 0.15)) continue;
@@ -106,9 +106,9 @@ public static class ConstructorSelva
         }
 
         Progreso("Bosque", 0.5f);
-        foreach (var p in Celdas(T.Bosque, 0.45f))
+        foreach (var p in Celdas(Cell.Bosque, 0.45f))
         {
-            bool grande = gigantes < 3 && Distancia(p, T.Borde, 7) > 6;
+            bool grande = gigantes < 3 && Distancia(p, Cell.Borde, 7) > 6;
             if (Cerca(troncos, p, grande ? 9f : 7.5f)) continue;
             Poner(grande ? gigante : Claro(p) ? arbolesPequenos : arboles, p, "Arbol");
             troncos.Add(p);
@@ -116,26 +116,26 @@ public static class ConstructorSelva
         }
 
         Progreso("Arbustos", 0.65f);
-        foreach (var p in Celdas(T.Borde, 0.35f))
+        foreach (var p in Celdas(Cell.Borde, 0.35f))
             if (!Cerca(troncos, p, 2.4f) && !Cerca(matas, p, 2.6f) && rnd.NextDouble() < 0.75) { Poner(arbustos, p, "Arbusto"); matas.Add(p); }
 
         Progreso("Hierba alta y decoración", 0.8f);
-        foreach (var p in Celdas(T.Pasto, 0.35f))
+        foreach (var p in Celdas(Cell.Pasto, 0.35f))
             if (rnd.NextDouble() < 0.75) Poner(hierba, p, "Hierba");
-        foreach (var p in Celdas(T.Piso, 0.4f))
+        foreach (var p in Celdas(Cell.Piso, 0.4f))
         {
-            bool junto = Distancia(p, T.Borde, 1) <= 1;
+            bool junto = Distancia(p, Cell.Borde, 1) <= 1;
             double r = rnd.NextDouble();
             if (junto && r < 0.04) Poner(piedras, p, "Piedra");
             else if (junto ? r < 0.16 : r < 0.06) Poner(plantas, p, "Planta");
         }
 
         // Inicio y salida.
-        var ini = Celdas(T.Inicio, 0f);
+        var ini = Celdas(Cell.Inicio, 0f);
         if (ini.Count > 0) Hijo(raiz, "Inicio_Jugador").localPosition = ini[0];
         Progreso("Carteles", 0.85f);
         Carteles();
-        var sal = Celdas(T.Salida, 0f);
+        var sal = Celdas(Cell.Salida, 0f);
         if (sal.Count > 0)
         {
             Vector3 a = sal[0], b = sal[0];
@@ -169,34 +169,34 @@ public static class ConstructorSelva
 
         var px = tex.GetPixels32();
         w = tex.width; h = tex.height;
-        mapa = new T[w, h];
+        mapa = new Cell[w, h];
         for (int i = 0; i < px.Length; i++)
-            mapa[i % w, i / w] = px[i].a < 128 ? T.Vacio : paleta.TryGetValue(px[i], out var t) ? t : T.Piso;
+            mapa[i % w, i / w] = px[i].a < 128 ? Cell.Vacio : paleta.TryGetValue(px[i], out var t) ? t : Cell.Piso;
 
         // Abrir la salida hasta el borde del mapa: detrás de ella el mapa trae una fila de borde (colisión y
         // árboles) y bosque que tapaban el paso a las ruinas. Queda un pasillo con borde arriba y abajo.
         int y0 = h, y1 = -1, xs = -1;
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                if (mapa[x, y] == T.Salida) { y0 = Mathf.Min(y0, y); y1 = Mathf.Max(y1, y); xs = Mathf.Max(xs, x); }
+                if (mapa[x, y] == Cell.Salida) { y0 = Mathf.Min(y0, y); y1 = Mathf.Max(y1, y); xs = Mathf.Max(xs, x); }
         for (int x = xs + 1; xs >= 0 && x < w; x++)
         {
-            for (int y = y0; y <= y1; y++) mapa[x, y] = T.Piso;
-            if (y0 > 0) mapa[x, y0 - 1] = T.Borde;
-            if (y1 < h - 1) mapa[x, y1 + 1] = T.Borde;
+            for (int y = y0; y <= y1; y++) mapa[x, y] = Cell.Piso;
+            if (y0 > 0) mapa[x, y0 - 1] = Cell.Borde;
+            if (y1 < h - 1) mapa[x, y1 + 1] = Cell.Borde;
         }
     }
 
     static Vector3 Pos(int x, int y) => new Vector3(x - w / 2f + 0.5f, 0f, y - h / 2f + 0.5f);
 
-    static T En(Vector3 p)
+    static Cell En(Vector3 p)
     {
         int x = Mathf.FloorToInt(p.x + w / 2f), y = Mathf.FloorToInt(p.z + h / 2f);
-        return x < 0 || y < 0 || x >= w || y >= h ? T.Vacio : mapa[x, y];
+        return x < 0 || y < 0 || x >= w || y >= h ? Cell.Vacio : mapa[x, y];
     }
 
     // Posiciones (con un poco de desorden) de las celdas de un tipo, en orden aleatorio.
-    static List<Vector3> Celdas(T t, float desorden)
+    static List<Vector3> Celdas(Cell t, float desorden)
     {
         var l = new List<Vector3>();
         for (int y = 0; y < h; y++)
@@ -216,7 +216,7 @@ public static class ConstructorSelva
     }
 
     // Distancia en celdas (anillos cuadrados) a la celda más cercana de un tipo, hasta 'max'.
-    static int Distancia(Vector3 p, T t, int max)
+    static int Distancia(Vector3 p, Cell t, int max)
     {
         for (int r = 0; r <= max; r++)
             for (int dy = -r; dy <= r; dy++)
@@ -237,8 +237,8 @@ public static class ConstructorSelva
         for (int y = 0; y < h * R; y++)
             for (int x = 0; x < w * R; x++)
             {
-                T t = mapa[x / R, y / R];
-                Color c = t == T.Pasto ? hierbaAlta : t == T.Borde || t == T.Bosque || t == T.Vacio ? sombra : cesped;
+                Cell t = mapa[x / R, y / R];
+                Color c = t == Cell.Pasto ? hierbaAlta : t == Cell.Borde || t == Cell.Bosque || t == Cell.Vacio ? sombra : cesped;
                 tex.SetPixel(x, y, c * (0.85f + 0.3f * (float)rnd.NextDouble()));
             }
         tex.Apply();
@@ -271,9 +271,9 @@ public static class ConstructorSelva
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
-                if (mapa[x, y] != T.Borde) continue;
+                if (mapa[x, y] != Cell.Borde) continue;
                 int x0 = x;
-                while (x + 1 < w && mapa[x + 1, y] == T.Borde) x++;
+                while (x + 1 < w && mapa[x + 1, y] == Cell.Borde) x++;
                 var c = go.AddComponent<BoxCollider>();
                 c.center = (Pos(x0, y) + Pos(x, y)) * 0.5f + Vector3.up * ALTO_MURO * 0.5f;
                 c.size = new Vector3(x - x0 + 1, ALTO_MURO, 1f);
@@ -307,13 +307,13 @@ public static class ConstructorSelva
         return false;
     }
 
-    static void Poner(Modelo[] lista, Vector3 pos, string nombre, Transform padre = null)
+    static void Poner(Model[] lista, Vector3 pos, string nombre, Transform padre = null)
     {
         // Elegir según el peso.
         float total = 0f;
         foreach (var x in lista) total += x.peso;
         float r = (float)rnd.NextDouble() * total;
-        Modelo m = lista[lista.Length - 1];
+        Model m = lista[lista.Length - 1];
         foreach (var x in lista) if ((r -= x.peso) <= 0f) { m = x; break; }
 
         var zona = padre != null ? padre : Zona(pos);
@@ -352,7 +352,7 @@ public static class ConstructorSelva
     // ---------------- Carteles de flecha ----------------
 
     static bool Caminable(int x, int y) => x >= 0 && y >= 0 && x < w && y < h &&
-        (mapa[x, y] == T.Piso || mapa[x, y] == T.Pasto || mapa[x, y] == T.Inicio || mapa[x, y] == T.Salida);
+        (mapa[x, y] == Cell.Piso || mapa[x, y] == Cell.Pasto || mapa[x, y] == Cell.Inicio || mapa[x, y] == Cell.Salida);
 
     // Camino más corto inicio -> salida (búsqueda en anchura desde la salida). Cada ~30 m se pone un cartel
     // pequeño de madera oscura a un lado del pasillo, junto a los árboles, apuntando hacia donde sigue el camino.
@@ -365,8 +365,8 @@ public static class ConstructorSelva
             for (int x = 0; x < w; x++)
             {
                 dist[x, y] = -1;
-                if (mapa[x, y] == T.Salida) { dist[x, y] = 0; cola.Enqueue(new Vector2Int(x, y)); }
-                if (mapa[x, y] == T.Inicio) inicio = new Vector2Int(x, y);
+                if (mapa[x, y] == Cell.Salida) { dist[x, y] = 0; cola.Enqueue(new Vector2Int(x, y)); }
+                if (mapa[x, y] == Cell.Inicio) inicio = new Vector2Int(x, y);
             }
         var dirs = new[] { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down };
         while (cola.Count > 0)
@@ -403,7 +403,7 @@ public static class ConstructorSelva
                     int x = camino[i].x + dx, y = camino[i].y + dy;
                     if (!Caminable(x, y) || dx * dx + dy * dy >= mejor) continue;
                     foreach (var d in dirs)
-                        if (x + d.x >= 0 && y + d.y >= 0 && x + d.x < w && y + d.y < h && mapa[x + d.x, y + d.y] == T.Borde)
+                        if (x + d.x >= 0 && y + d.y >= 0 && x + d.x < w && y + d.y < h && mapa[x + d.x, y + d.y] == Cell.Borde)
                         { mejor = dx * dx + dy * dy; p = Pos(x, y); break; }
                 }
 
@@ -446,7 +446,7 @@ public static class ConstructorSelva
         System.Func<float, float, Vector3> EnAro = (ang, r) => c + new Vector3(Mathf.Cos(ang * Mathf.Deg2Rad), 0f, Mathf.Sin(ang * Mathf.Deg2Rad)) * r;
         System.Func<string, Vector3, float, Transform> Pieza = (nombre, pos, giro) =>
         {
-            var pf = ConstructorSelva.Ruina(nombre);
+            var pf = JungleBuilder.Ruina(nombre);
             if (pf == null) { Debug.LogWarning("Falta la pieza de ruinas " + nombre); return null; }
             var t = ((GameObject)PrefabUtility.InstantiatePrefab(pf, raiz)).transform;
             t.localPosition = pos;
@@ -565,9 +565,9 @@ public static class ConstructorSelva
 
         var pelea = Hijo(raiz, "Pelea");
         Hijo(pelea, "Aparicion_Enemigo").localPosition = c + Vector3.right * 6f;
-        // Al vencer al Nahual, el script de la pelea debe llamar a  pelea.GetComponent<CambiarEscena>().Cargar()
-        // (o, desde un evento, a CambiarEscena > Cargar ()): pasa a la cinemática de los molletes.
-        pelea.gameObject.AddComponent<CambiarEscena>().escena = "MolletesCinematica";
+        // Al vencer al Nahual, el script de la pelea debe llamar a  pelea.GetComponent<SceneChanger>().Cargar()
+        // (o, desde un evento, a SceneChanger > Cargar ()): pasa a la cinemática de los molletes.
+        pelea.gameObject.AddComponent<SceneChanger>().escena = "MolletesCinematica";
         pelea.gameObject.SetActive(false);
 
         var linea = Hijo(raiz, "Linea_Ruinas");
@@ -575,7 +575,7 @@ public static class ConstructorSelva
         var trig = linea.gameObject.AddComponent<BoxCollider>();
         trig.isTrigger = true;
         trig.size = new Vector3(1.5f, ALTO_MURO, ancho + 2f);
-        var entrada = linea.gameObject.AddComponent<EntradaRuinas>();
+        var entrada = linea.gameObject.AddComponent<RuinsEntrance>();
         entrada.laberinto = laberinto.gameObject;
         entrada.cierre = cierre.gameObject;
         entrada.pelea = pelea.gameObject;
@@ -594,7 +594,7 @@ public static class ConstructorSelva
         if (!CargarModelos()) return null;
 
         rnd = new System.Random(SEMILLA);
-        var sal = Celdas(T.Salida, 0f);
+        var sal = Celdas(Cell.Salida, 0f);
         if (sal.Count == 0) return null;
         Vector3 a = sal[0], b = sal[0];
         foreach (var p in sal) { a = Vector3.Min(a, p); b = Vector3.Max(b, p); }
@@ -628,7 +628,7 @@ public static class ConstructorSelva
         return m;
     }
 
-    // La neblina, el color de fondo y el alcance de la cámara los aplica CargaSelva al iniciar.
+    // La neblina, el color de fondo y el alcance de la cámara los aplica JungleStreamer al iniciar.
     static void ConfigurarEscena()
     {
         RenderSettings.skybox = null;
@@ -645,8 +645,8 @@ public static class ConstructorSelva
 
         var cam = Camera.main;
         if (cam == null) return;
-        var carga = cam.GetComponent<CargaSelva>();
-        if (carga == null) carga = cam.gameObject.AddComponent<CargaSelva>();
+        var carga = cam.GetComponent<JungleStreamer>();
+        if (carga == null) carga = cam.gameObject.AddComponent<JungleStreamer>();
         carga.zonas = zonas;
     }
 

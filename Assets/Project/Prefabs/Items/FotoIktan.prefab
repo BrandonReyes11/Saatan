@@ -248,7 +248,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: dc44f8c89b2e4b6c8b36885a654e153a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Recogible
+  m_EditorClassIdentifier: Assembly-CSharp::Pickup
   objeto: FotoIktan
   alRecoger:
     m_PersistentCalls:

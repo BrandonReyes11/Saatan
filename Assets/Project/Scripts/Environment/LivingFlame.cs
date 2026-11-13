@@ -1,7 +1,7 @@
 // Saatan Historia - Llama que parpadea y se inclina cuando Iktan pasa cerca.
 using UnityEngine;
 
-public class LlamaViva : MonoBehaviour
+public class LivingFlame : MonoBehaviour
 {
     public Light luz;
     public float agitacion = 0.45f;     // qué tanto cambia el tamaño
@@ -18,7 +18,7 @@ public class LlamaViva : MonoBehaviour
         posBase = transform.localPosition;
         semilla = Random.value * 100f;
         if (luz != null) intensidadBase = luz.intensity;
-        var c = FindFirstObjectByType<ControlIktan>();
+        var c = FindFirstObjectByType<IktanController>();
         if (c != null) jugador = c.transform;
     }
 

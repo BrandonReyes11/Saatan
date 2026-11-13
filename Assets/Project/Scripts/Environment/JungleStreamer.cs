@@ -1,10 +1,10 @@
-// Saatan Historia - Carga por zonas y neblina de la selva (va en la Main Camera; ConstructorSelva lo agrega solo).
+// Saatan Historia - Carga por zonas y neblina de la selva (va en la Main Camera; JungleBuilder lo agrega solo).
 // Solo deja activas las zonas cercanas a Iktan, cambiando pocas por cuadro para que no haya tirones.
 // La neblina se aplica al iniciar, así siempre se ve y tapa el borde de lo que está cargado.
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CargaSelva : MonoBehaviour
+public class JungleStreamer : MonoBehaviour
 {
     public Transform zonas;                 // Selva_Laberinto/Zonas
     public Transform jugador;               // vacío = se busca a Iktan
@@ -33,7 +33,7 @@ public class CargaSelva : MonoBehaviour
             cam.farClipPlane = finNiebla + 2f;
         }
 
-        if (jugador == null && FindFirstObjectByType<ControlIktan>() is ControlIktan c) jugador = c.transform;
+        if (jugador == null && FindFirstObjectByType<IktanController>() is IktanController c) jugador = c.transform;
         if (zonas == null || jugador == null) { enabled = false; return; }
 
         foreach (Transform z in zonas)

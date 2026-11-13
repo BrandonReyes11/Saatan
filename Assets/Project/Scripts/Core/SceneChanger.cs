@@ -1,18 +1,18 @@
-// Saatan Historia - Cambio de escena (con fundido a negro, ver Transicion).
+// Saatan Historia - Cambio de escena (con fundido a negro, ver SceneTransition).
 //
 // Uso (igual que en el video de apoyo):
 //   1. Pon este script en un objeto de la escena (por ejemplo "GestorEscenas").
 //   2. En el botón, en la lista On Click (), arrastra ese objeto.
-//   3. Elige CambiarEscena > CargarEscena (string) y escribe el nombre de la escena, p. ej. NivelSelva.
-//      O llena el campo "escena" y elige CambiarEscena > Cargar ().
-//   Desde código: GetComponent<CambiarEscena>().Cargar();
+//   3. Elige SceneChanger > CargarEscena (string) y escribe el nombre de la escena, p. ej. NivelSelva.
+//      O llena el campo "escena" y elige SceneChanger > Cargar ().
+//   Desde código: GetComponent<SceneChanger>().Cargar();
 //
 // La escena debe estar en File > Build Profiles (Scene List). Orden del juego:
 //   MenuPrincipal > NivelSelva > MolletesCinematica > CinematicaIglesia > NivelIglesia > AltarCInematica
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class CambiarEscena : MonoBehaviour
+public class SceneChanger : MonoBehaviour
 {
     [Tooltip("Escena que carga Cargar(). Vacío = la siguiente de la lista del Build.")]
     public string escena = "";
@@ -25,18 +25,18 @@ public class CambiarEscena : MonoBehaviour
 
     public void CargarEscena(string nombreEscena)
     {
-        if (string.IsNullOrEmpty(nombreEscena)) { Debug.LogWarning("CambiarEscena: no se indicó el nombre de la escena."); return; }
-        Transicion.Cargar(nombreEscena);
+        if (string.IsNullOrEmpty(nombreEscena)) { Debug.LogWarning("SceneChanger: no se indicó el nombre de la escena."); return; }
+        SceneTransition.Cargar(nombreEscena);
     }
 
     public void CargarEscenaPorIndice(int indice)
     {
         if (indice < 0 || indice >= SceneManager.sceneCountInBuildSettings)
         {
-            Debug.LogError("CambiarEscena: no existe una escena con el índice " + indice + " en el Build.");
+            Debug.LogError("SceneChanger: no existe una escena con el índice " + indice + " en el Build.");
             return;
         }
-        Transicion.Cargar(System.IO.Path.GetFileNameWithoutExtension(SceneUtility.GetScenePathByBuildIndex(indice)));
+        SceneTransition.Cargar(System.IO.Path.GetFileNameWithoutExtension(SceneUtility.GetScenePathByBuildIndex(indice)));
     }
 
     public void SiguienteEscena() => CargarEscenaPorIndice(SceneManager.GetActiveScene().buildIndex + 1);
