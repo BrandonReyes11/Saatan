@@ -206,7 +206,7 @@ public static class ConstructorCinematicas
             if (l.type == LightType.Directional) Object.DestroyImmediate(l.gameObject);
         RenderSettings.skybox = null;
         RenderSettings.ambientMode = AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.01f, 0.01f, 0.012f);
+        RenderSettings.ambientLight = new Color(0.03f, 0.025f, 0.03f);   // casi negro: solo se distinguen las siluetas
         RenderSettings.fog = false;
 
         var cam = Camera.main;

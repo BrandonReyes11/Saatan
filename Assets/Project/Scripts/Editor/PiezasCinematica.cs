@@ -110,15 +110,36 @@ public static class PiezasCinematica
         AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", tipo, propiedad), c);
     }
 
+    // Las curvas de posición y rotación son ABSOLUTAS (coordenadas locales del objeto):
+    //  - si el clip no anima posición/rotación, se le agregan constantes con las actuales, para que el
+    //    Timeline no mueva el objeto al origen;
+    //  - "Remove Start Offset" se desactiva y la pista usa offsets de transform en cero, así el Timeline
+    //    no resta la posición inicial (eso dejaba la cámara y a Iktan bajo el suelo).
     public static void PistaAnimacion(TimelineAsset tl, PlayableDirector d, GameObject go, AnimationClip clip)
     {
+        float largo = Mathf.Max(clip.length, 0.1f);
+        var t = go.transform;
+        string[] props = { "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z", "localEulerAnglesRaw.x", "localEulerAnglesRaw.y", "localEulerAnglesRaw.z" };
+        float[] actuales = { t.localPosition.x, t.localPosition.y, t.localPosition.z, t.localEulerAngles.x, t.localEulerAngles.y, t.localEulerAngles.z };
+        for (int k = 0; k < 6; k++)
+            if (AnimationUtility.GetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Transform), props[k])) == null)
+                AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Transform), props[k]), AnimationCurve.Constant(0f, largo, actuales[k]));
+
         clip.name = go.name;
         AssetDatabase.AddObjectToAsset(clip, tl);
         var an = go.GetComponent<Animator>();
         if (an == null) an = go.AddComponent<Animator>();
+        an.applyRootMotion = false;
         var pista = tl.CreateTrack<AnimationTrack>(null, go.name);
+        pista.trackOffset = TrackOffset.ApplyTransformOffsets;
+        pista.position = Vector3.zero;
+        pista.rotation = Quaternion.identity;
         var tc = pista.CreateClip(clip);
         tc.start = 0;
+        var asset = (AnimationPlayableAsset)tc.asset;
+        asset.removeStartOffset = false;
+        asset.position = Vector3.zero;
+        asset.rotation = Quaternion.identity;
         d.SetGenericBinding(pista, an);
     }
 
