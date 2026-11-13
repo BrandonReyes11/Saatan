@@ -1,8 +1,11 @@
-// Saatan Historia - Cinemáticas MolletesCinematica y AltarCInematica.
+// Saatan Historia - Cinemáticas MolletesCinematica y AltarCInematica, hechas con Timeline
+// (objeto "Cinematica" con PlayableDirector; se pueden abrir en Window > Sequencing > Timeline).
+// Al terminar: Molletes -> CinematicaIglesia, Altar -> MenuPrincipal.
 // Menú: Saatan > Escenas > Crear MolletesCinematica  |  Saatan > Escenas > Crear AltarCinematica
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Timeline;
 using static PiezasCinematica;
 
 public static class ConstructorCinematicas
@@ -87,22 +90,44 @@ public static class ConstructorCinematicas
         forma.radius = 0.8f;
         chispas.GetComponent<ParticleSystemRenderer>().sharedMaterial = Aditivo("Chispa", new Color(1f, 0.8f, 0.4f));
 
-        var sec = raiz.gameObject.AddComponent<SecuenciaNahual>();
-        sec.nahual = nahual;
-        sec.destello = destello;
-        sec.molletes = molletes;
-        sec.luz = luz;
-        sec.chispas = chispas;
-
         Ambiente(niebla, 0.55f, new Color(0.45f, 0.5f, 0.45f), 4f, 24f);   // neblina espesa: el fondo se pierde
-        Camera.main.farClipPlane = 30f;
         var cam = Camera.main;
-        var cine = cam.gameObject.AddComponent<CamaraCinematica>();
-        cine.puntos = new[] { new Vector3(-3.5f, 2.2f, -7.5f), new Vector3(-1.5f, 1.8f, -5.5f), new Vector3(2.5f, 1.6f, -3.5f), new Vector3(3f, 1.4f, -1f) };
-        cine.objetivo = new Vector3(0f, 1f, 3f);
-        cine.duracion = 13f;
-        cam.transform.position = cine.puntos[0];
-        cam.transform.LookAt(cine.objetivo);
+        cam.farClipPlane = 30f;
+
+        // ---- Timeline (13 s): 2.5 s de calma, 4 s llenándose de luz, destello a los 6.5 s y aparecen los molletes ----
+        const float dur = 13f, brilla = 2.5f, estalla = 6.5f;
+        var d = Director(raiz, "Molletes", "CinematicaIglesia", out var tl);
+        System.Func<float, float> Luz = t => { float a = Mathf.Clamp01((t - brilla) / (estalla - brilla)); return a * a; };   // 0..1 antes del destello
+
+        // Nahual: tiembla cada vez más y desaparece en el destello.
+        Vector3 baseNahual = nahual.localPosition;
+        Quaternion rotNahual = nahual.localRotation;
+        PistaMovimiento(tl, d, nahual.gameObject, estalla, t =>
+            (baseNahual + new Vector3(Mathf.PerlinNoise(t * 25f, 1f) - 0.5f, 0f, Mathf.PerlinNoise(t * 25f, 7f) - 0.5f) * 0.14f * Luz(t), rotNahual), 0.05f);
+        PistaActivacion(tl, d, nahual.gameObject, 0f, estalla);
+
+        // Destello: crece mientras brilla, explota (0.35 s) y se apaga en 2 s. La luz lo acompaña.
+        PistaAnimacion(tl, d, destello.gameObject, Muestreo(dur, 0.05f, typeof(Transform), new[] { "m_LocalScale.x", "m_LocalScale.y", "m_LocalScale.z" }, t =>
+        {
+            float e = Mathf.Clamp01((t - estalla) / 0.35f), f = Mathf.Clamp01((t - estalla - 0.35f) / 2f);
+            float esc = t < estalla ? 3.2f * Luz(t) : Mathf.Lerp(3.2f, 7f, e) * (1f - f);
+            return new[] { esc, esc, esc };
+        }));
+        PistaAnimacion(tl, d, luz.gameObject, Muestreo(dur, 0.05f, typeof(Light), new[] { "m_Intensity" }, t =>
+            new[] { t < estalla ? 14f * Luz(t) : Mathf.Lerp(30f, 2f, Mathf.Clamp01((t - estalla - 0.35f) / 2f)) }));
+        PistaParticulas(tl, d, chispas.gameObject, estalla, 3f);
+
+        // Molletes: aparecen con un rebote y giran despacio.
+        PistaAnimacion(tl, d, molletes.gameObject, Muestreo(dur, 0.05f, typeof(Transform),
+            new[] { "m_LocalScale.x", "m_LocalScale.y", "m_LocalScale.z", "localEulerAnglesRaw.y" }, t =>
+            {
+                float m = Mathf.Clamp01((t - estalla - 0.25f) / 1.2f), esc = 3f * m * (1f + Mathf.Sin(m * Mathf.PI) * 0.25f);
+                return new[] { esc, esc, esc, Mathf.Max(0f, t - estalla) * 20f };
+            }));
+
+        // Cámara: rodea despacio a los personajes mirando al Nahual.
+        CamaraPorPuntos(tl, d, cam, new[] { new Vector3(-3.5f, 2.2f, -7.5f), new Vector3(-1.5f, 1.8f, -5.5f), new Vector3(2.5f, 1.6f, -3.5f), new Vector3(3f, 1.4f, -1f) },
+            new Vector3(0f, 1f, 3f), dur);
         GuardarEscena("Assets/Project/Scenes/MolletesCinematica.unity");
     }
 
@@ -187,16 +212,43 @@ public static class ConstructorCinematicas
         var cam = Camera.main;
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.backgroundColor = Color.black;
-        var cine = cam.gameObject.AddComponent<CamaraCinematica>();
-        cine.puntos = new[] { new Vector3(0f, 1.6f, -12f), new Vector3(0f, 1.8f, -7f), new Vector3(0f, 2.1f, -3.5f), new Vector3(0f, 2.45f, -1.15f) };
-        cine.objetivo = new Vector3(0f, Tope(2) + 0.33f, 0.3f);
-        cine.duracion = 26f;
-        cam.transform.position = cine.puntos[0];
-        cam.transform.LookAt(cine.objetivo);
+        // Timeline (26 s): la cámara se acerca muy despacio desde el fondo del cuarto hasta la foto; luego al menú.
+        var d = Director(raiz, "Altar", "MenuPrincipal", out var tl);
+        CamaraPorPuntos(tl, d, cam, new[] { new Vector3(0f, 1.6f, -12f), new Vector3(0f, 1.8f, -7f), new Vector3(0f, 2.1f, -3.5f), new Vector3(0f, 2.45f, -1.15f) },
+            new Vector3(0f, Tope(2) + 0.33f, 0.3f), 26f);
         GuardarEscena("Assets/Project/Scenes/AltarCInematica.unity");
     }
 
     // ---------------- Utilidades ----------------
+
+    static void CamaraPorPuntos(TimelineAsset tl, UnityEngine.Playables.PlayableDirector d, Camera cam, Vector3[] puntos, Vector3 objetivo, float dur)
+    {
+        cam.transform.position = puntos[0];
+        cam.transform.LookAt(objetivo);
+        PistaMovimiento(tl, d, cam.gameObject, dur, t =>
+        {
+            Vector3 p = Recorrido(puntos, t / dur);
+            return (p, Quaternion.LookRotation(objetivo - p));
+        });
+    }
+
+    // Clip con varias propiedades muestreadas cada 'paso' segundos: valores(t) devuelve un número por propiedad.
+    static AnimationClip Muestreo(float dur, float paso, System.Type tipo, string[] props, System.Func<float, float[]> valores)
+    {
+        int n = Mathf.CeilToInt(dur / paso) + 1;
+        var t = new float[n];
+        var v = new float[props.Length][];
+        for (int k = 0; k < props.Length; k++) v[k] = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            t[i] = Mathf.Min(i * paso, dur);
+            var x = valores(t[i]);
+            for (int k = 0; k < props.Length; k++) v[k][i] = x[k];
+        }
+        var clip = new AnimationClip();
+        for (int k = 0; k < props.Length; k++) Curva(clip, tipo, props[k], t, v[k]);
+        return clip;
+    }
 
     // Modelo voxel de la selva escalado a 'altura' metros, con el material de colores por vértice.
     static void Modelo(string ruta, Transform padre, Vector3 pos, float giro, float altura, Material mat)

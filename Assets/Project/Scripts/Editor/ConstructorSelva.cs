@@ -558,6 +558,9 @@ public static class ConstructorSelva
 
         var pelea = Hijo(raiz, "Pelea");
         Hijo(pelea, "Aparicion_Enemigo").localPosition = c + Vector3.right * 6f;
+        // Al vencer al Nahual, el script de la pelea debe llamar a  pelea.GetComponent<CambiarEscena>().Cargar()
+        // (o, desde un evento, a CambiarEscena > Cargar ()): pasa a la cinemática de los molletes.
+        pelea.gameObject.AddComponent<CambiarEscena>().escena = "MolletesCinematica";
         pelea.gameObject.SetActive(false);
 
         var linea = Hijo(raiz, "Linea_Ruinas");

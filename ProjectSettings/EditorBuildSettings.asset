@@ -12,14 +12,14 @@ EditorBuildSettings:
     path: Assets/Project/Scenes/NivelSelva.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
+    path: Assets/Project/Scenes/MolletesCinematica.unity
+    guid: 0646318f28a8944daa3cfc4c66a654ee
+  - enabled: 1
     path: Assets/Project/Scenes/CinematicaIglesia.unity
     guid: e374aac77afb84a1eb6c8f1f9ea719f3
   - enabled: 1
     path: Assets/Project/Scenes/NivelIglesia.unity
     guid: 9635ea0ee1b4142b3b294e159fbb2518
-  - enabled: 1
-    path: Assets/Project/Scenes/MolletesCinematica.unity
-    guid: 0646318f28a8944daa3cfc4c66a654ee
   - enabled: 1
     path: Assets/Project/Scenes/AltarCInematica.unity
     guid: b49cf2a52bcae45eba0bcfd421447e43

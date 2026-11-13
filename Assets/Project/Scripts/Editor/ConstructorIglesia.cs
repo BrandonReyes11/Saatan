@@ -259,6 +259,9 @@ public static class ConstructorIglesia
             }
 
         Abandono(raiz);
+        // Al terminar el nivel (vencer al Diablo), llamar a  Fin_Nivel.GetComponent<CambiarEscena>().Cargar():
+        // pasa a la cinemática del altar.
+        Grupo(raiz, "Fin_Nivel", Vector3.zero).gameObject.AddComponent<CambiarEscena>().escena = "AltarCInematica";
         HerramientasIktan.DarVidaAlFuego(raiz.gameObject);
         ConfigurarEscena();
         HerramientasIktan.CrearJugador();   // Iktan en el nuevo punto de inicio, con la cámara en tercera persona

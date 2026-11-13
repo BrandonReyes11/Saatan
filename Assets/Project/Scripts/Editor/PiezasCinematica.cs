@@ -6,7 +6,9 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Playables;
 using UnityEngine.Rendering;
+using UnityEngine.Timeline;
 
 public static class PiezasCinematica
 {
@@ -48,6 +50,130 @@ public static class PiezasCinematica
         AssetDatabase.DeleteAsset(ruta);
         AssetDatabase.CreateAsset(asset, ruta);
         return asset;
+    }
+
+    // ---------------- Timeline (método de las cinemáticas) ----------------
+    // Cada cinemática tiene un objeto "Cinematica" con PlayableDirector + FinCinematica y un TimelineAsset
+    // (Niveles/Cinematica/Timeline_<nombre>.playable) con pistas de animación, activación y control.
+    // Se puede abrir y retocar en Window > Sequencing > Timeline.
+
+    public static PlayableDirector Director(Transform raiz, string nombre, string escenaSiguiente, out TimelineAsset tl)
+    {
+        tl = Guardar(ScriptableObject.CreateInstance<TimelineAsset>(), CARPETA + "/Timeline_" + nombre + ".playable");
+        var go = new GameObject("Cinematica");
+        go.transform.SetParent(raiz, false);
+        var d = go.AddComponent<PlayableDirector>();
+        d.playableAsset = tl;
+        d.playOnAwake = true;
+        d.extrapolationMode = DirectorWrapMode.Hold;   // al terminar se queda en el último cuadro
+        go.AddComponent<FinCinematica>().escenaSiguiente = escenaSiguiente;
+        return d;
+    }
+
+    // Pista de animación que mueve 'go' muestreando muestra(t) -> (posición, rotación) cada 'paso' segundos.
+    public static void PistaMovimiento(TimelineAsset tl, PlayableDirector d, GameObject go, float duracion,
+        System.Func<float, (Vector3 pos, Quaternion rot)> muestra, float paso = 0.1f)
+    {
+        int n = Mathf.CeilToInt(duracion / paso) + 1;
+        var tiempos = new float[n];
+        var valores = new float[6][];
+        for (int k = 0; k < 6; k++) valores[k] = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            float t = Mathf.Min(i * paso, duracion);
+            var (pos, rot) = muestra(t);
+            Vector3 e = rot.eulerAngles;
+            tiempos[i] = t;
+            for (int k = 0; k < 3; k++)
+            {
+                valores[k][i] = pos[k];
+                float ang = e[k];   // sin saltos de 360° entre muestras
+                if (i > 0) ang = valores[3 + k][i - 1] + Mathf.DeltaAngle(valores[3 + k][i - 1], ang);
+                valores[3 + k][i] = ang;
+            }
+        }
+        string[] props = { "m_LocalPosition.x", "m_LocalPosition.y", "m_LocalPosition.z", "localEulerAnglesRaw.x", "localEulerAnglesRaw.y", "localEulerAnglesRaw.z" };
+        var clip = new AnimationClip();
+        for (int k = 0; k < 6; k++) Curva(clip, typeof(Transform), props[k], tiempos, valores[k]);
+        PistaAnimacion(tl, d, go, clip);
+    }
+
+    public static void Curva(AnimationClip clip, System.Type tipo, string propiedad, float[] t, float[] v)
+    {
+        var c = new AnimationCurve();
+        for (int i = 0; i < t.Length; i++) c.AddKey(new Keyframe(t[i], v[i]));
+        for (int i = 0; i < c.length; i++)
+        {
+            AnimationUtility.SetKeyLeftTangentMode(c, i, AnimationUtility.TangentMode.ClampedAuto);
+            AnimationUtility.SetKeyRightTangentMode(c, i, AnimationUtility.TangentMode.ClampedAuto);
+        }
+        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", tipo, propiedad), c);
+    }
+
+    public static void PistaAnimacion(TimelineAsset tl, PlayableDirector d, GameObject go, AnimationClip clip)
+    {
+        clip.name = go.name;
+        AssetDatabase.AddObjectToAsset(clip, tl);
+        var an = go.GetComponent<Animator>();
+        if (an == null) an = go.AddComponent<Animator>();
+        var pista = tl.CreateTrack<AnimationTrack>(null, go.name);
+        var tc = pista.CreateClip(clip);
+        tc.start = 0;
+        d.SetGenericBinding(pista, an);
+    }
+
+    // El objeto solo está activo entre 'desde' y 'hasta' (en segundos).
+    public static void PistaActivacion(TimelineAsset tl, PlayableDirector d, GameObject go, float desde, float hasta)
+    {
+        var pista = tl.CreateTrack<ActivationTrack>(null, go.name + " (activo)");
+        pista.postPlaybackState = ActivationTrack.PostPlaybackState.LeaveAsIs;
+        var c = pista.CreateDefaultClip();
+        c.start = desde;
+        c.duration = hasta - desde;
+        d.SetGenericBinding(pista, go);
+    }
+
+    // Reproduce un sistema de partículas desde 'desde' durante 'duracion' segundos.
+    public static void PistaParticulas(TimelineAsset tl, PlayableDirector d, GameObject go, float desde, float duracion)
+    {
+        var pista = tl.CreateTrack<ControlTrack>(null, go.name);
+        var c = pista.CreateClip<ControlPlayableAsset>();
+        c.start = desde;
+        c.duration = duracion;
+        var asset = (ControlPlayableAsset)c.asset;
+        asset.sourceGameObject.exposedName = GUID.Generate().ToString();
+        d.SetReferenceValue(asset.sourceGameObject.exposedName, go);
+        asset.updateParticle = true;
+    }
+
+    // Curva Catmull-Rom por varios puntos (u de 0 a 1, con arranque y frenado suaves).
+    public static Vector3 Recorrido(Vector3[] p, float u)
+    {
+        u = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(u)) * (p.Length - 1);
+        int i = Mathf.Min((int)u, p.Length - 2);
+        float f = u - i;
+        Vector3 p0 = p[Mathf.Max(i - 1, 0)], p1 = p[i], p2 = p[i + 1], p3 = p[Mathf.Min(i + 2, p.Length - 1)];
+        return 0.5f * (2f * p1 + (p2 - p0) * f + (2f * p0 - 5f * p1 + 4f * p2 - p3) * f * f + (3f * p1 - p0 - 3f * p2 + p3) * f * f * f);
+    }
+
+    // Posición a velocidad constante por una línea de puntos, con 'espera' segundos quieto al inicio.
+    public static (Vector3 pos, Vector3 dir) EnRuta(Vector3[] p, float velocidad, float espera, float t)
+    {
+        float s = Mathf.Max(0f, t - espera) * velocidad;
+        for (int i = 0; i < p.Length - 1; i++)
+        {
+            float l = Vector3.Distance(p[i], p[i + 1]);
+            if (s <= l || i == p.Length - 2) return (Vector3.Lerp(p[i], p[i + 1], Mathf.Clamp01(s / l)), p[i + 1] - p[i]);
+            s -= l;
+        }
+        return (p[p.Length - 1], Vector3.forward);
+    }
+
+    public static float LargoRuta(Vector3[] p)
+    {
+        float l = 0f;
+        for (int i = 0; i < p.Length - 1; i++) l += Vector3.Distance(p[i], p[i + 1]);
+        return l;
     }
 
     // ---------------- Materiales ----------------

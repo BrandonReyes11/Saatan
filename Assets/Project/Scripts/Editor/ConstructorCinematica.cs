@@ -1,6 +1,7 @@
 // Saatan Historia - Escena CinematicaIglesia: la iglesia (Art/Iglesia, ch_iso) sobre una pequeña colina,
 // escaleras de piedra para subir, cementerio alrededor, árboles y neblina que oculta el borde del mapa.
 // Iktan y Abbi suben la escalera y llegan a la puerta gigante (hecha con cubos, cierra el hueco de la entrada).
+// La cinemática es un Timeline (objeto "Cinematica"); al terminar pasa a NivelIglesia.
 // Menú: Saatan > Escenas > Crear CinematicaIglesia  (crea Assets/Project/Scenes/CinematicaIglesia.unity y la agrega al Build)
 using System.Collections.Generic;
 using System.IO;
@@ -43,7 +44,8 @@ public static class ConstructorCinematica
         Puerta();
         Cementerio();
         Arboles();
-        Ambiente(Personajes());
+        Ambiente();
+        Timeline();
 
         EditorSceneManager.SaveScene(escena, ESCENA);
         var lista = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
@@ -235,32 +237,62 @@ public static class ConstructorCinematica
         Cubo(g, new Vector3(0f, alto * 0.75f, 6f), new Vector3(ancho + 1f, alto * 1.5f + 1f, 11f), Lit("Interior", new Color(0.03f, 0.03f, 0.035f)));
     }
 
-    // ---------------- Iktan y Abbi subiendo ----------------
+    // ---------------- Timeline: Iktan y Abbi suben y la cámara los sigue ----------------
 
-    static Transform Personajes()
+    static void Timeline()
     {
+        var d = PiezasCinematica.Director(raiz, "Iglesia", "NivelIglesia", out var tl);
         // Línea de la escalera: de y 0 (z -74) a y ALTO (z -34); luego el camino y el pórtico hasta la puerta.
         System.Func<float, float, Vector3[]> Ruta = (x, z0) => new[]
         {
             new Vector3(x, 0.05f, z0), new Vector3(x, 0.2f, -(R_CIMA + SUBIDA) - 0.5f), new Vector3(x, ALTO + 0.2f, -R_CIMA + 0.5f),
             new Vector3(x, ALTO + 0.2f, -21.5f), new Vector3(x * 0.6f, ALTO + 0.65f, -18.6f),
         };
-        var iktan = PiezasCinematica.Personaje("IktanVoxel", raiz, Vector3.zero, 0f, 1.4f);
-        var r = iktan.gameObject.AddComponent<RecorridoPersonaje>();
-        r.puntos = Ruta(-0.9f, -82f);
-        r.velocidad = 2f;
-        r.espera = 1.5f;
+        const float vel = 2f, espera = 1.5f;
+        Vector3[] rutaIktan = Ruta(-0.9f, -82f), rutaAbbi = Ruta(1.1f, -83.5f);
+        float dur = espera + PiezasCinematica.LargoRuta(rutaAbbi) / vel + 3.5f;   // + unos segundos frente a la puerta
 
-        var abbi = PiezasCinematica.Personaje("AbbiVoxel", raiz, Vector3.zero, 0f, 0.55f);
-        var ra = abbi.gameObject.AddComponent<RecorridoPersonaje>();
-        ra.puntos = Ruta(1.1f, -83.5f);
-        ra.velocidad = 2.05f;
-        ra.espera = 1.5f;
-        ra.paso = 14f;
-        return iktan;
+        foreach (var (archivo, ruta, alto) in new[] { ("IktanVoxel", rutaIktan, 1.4f), ("AbbiVoxel", rutaAbbi, 0.55f) })
+        {
+            var p = PiezasCinematica.Personaje(archivo, raiz, ruta[0], 0f, alto);
+            p.gameObject.AddComponent<AndarVoxel>().pasosPorMetro = archivo == "AbbiVoxel" ? 4f : 2.2f;
+            PiezasCinematica.PistaMovimiento(tl, d, p.gameObject, dur, t =>
+            {
+                var (pos, dir) = PiezasCinematica.EnRuta(ruta, vel, espera, t);
+                dir.y = 0f;
+                return (pos, Quaternion.LookRotation(dir.sqrMagnitude > 0.0001f ? dir : Vector3.forward));
+            });
+        }
+
+        // Cámara: va detrás de Iktan con suavizado y en los últimos segundos levanta la vista hacia la puerta.
+        var cam = Camera.main;
+        if (cam == null) return;
+        Vector3 distancia = new Vector3(-3.5f, 3.2f, -7.5f), objetivo = new Vector3(0f, ALTO + 7f, -16f);
+        const int fps = 30;
+        int n = Mathf.CeilToInt(dur * fps) + 1;
+        var posiciones = new Vector3[n];
+        var rotaciones = new Quaternion[n];
+        Vector3 c = rutaIktan[0] + distancia;
+        Quaternion r = Quaternion.LookRotation(rutaIktan[0] + Vector3.up - c);
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)fps;
+            Vector3 iktan = PiezasCinematica.EnRuta(rutaIktan, vel, espera, t).pos;
+            c = Vector3.Lerp(c, iktan + distancia, 1f - Mathf.Exp(-2f / fps));
+            Vector3 mira = Vector3.Lerp(iktan + Vector3.up, objetivo, Mathf.SmoothStep(0f, 1f, (t / dur - 0.8f) / 0.2f));
+            r = Quaternion.Slerp(r, Quaternion.LookRotation(mira - c), 1f - Mathf.Exp(-5f / fps));
+            posiciones[i] = c;
+            rotaciones[i] = r;
+        }
+        cam.transform.SetPositionAndRotation(posiciones[0], rotaciones[0]);
+        PiezasCinematica.PistaMovimiento(tl, d, cam.gameObject, dur, t =>
+        {
+            int i = Mathf.Clamp(Mathf.RoundToInt(t * fps), 0, n - 1);
+            return (posiciones[i], rotaciones[i]);
+        }, 0.2f);
     }
 
-    static void Ambiente(Transform iktan)
+    static void Ambiente()
     {
         RenderSettings.skybox = null;
         RenderSettings.ambientMode = AmbientMode.Flat;
@@ -286,15 +318,6 @@ public static class ConstructorCinematica
         cam.clearFlags = CameraClearFlags.SolidColor;
         cam.backgroundColor = NIEBLA;
         cam.farClipPlane = 200f;
-        // La cámara sigue a Iktan por detrás y al llegar levanta la vista hacia la puerta gigante.
-        var cine = cam.gameObject.AddComponent<CamaraCinematica>();
-        cine.puntos = new Vector3[0];
-        cine.seguir = iktan;
-        cine.distancia = new Vector3(-3.5f, 3.2f, -7.5f);
-        cine.objetivo = new Vector3(0f, ALTO + 7f, -16f);
-        cine.duracion = 38f;
-        cam.transform.position = new Vector3(-0.9f, 0f, -82f) + cine.distancia;
-        cam.transform.LookAt(new Vector3(-0.9f, 1f, -82f));
     }
 
     // ---------------- Utilidades ----------------
